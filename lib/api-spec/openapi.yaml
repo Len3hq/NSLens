@@ -413,6 +413,10 @@ components:
         project: { type: ["string", "null"] }
         context: { type: ["string", "null"] }
         company: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        telegramUsername: { type: ["string", "null"] }
+        xUsername: { type: ["string", "null"] }
+        discordUsername: { type: ["string", "null"] }
         tags:
           type: array
           items: { type: string }
@@ -425,6 +429,10 @@ components:
         project: { type: ["string", "null"] }
         context: { type: ["string", "null"] }
         company: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        telegramUsername: { type: ["string", "null"] }
+        xUsername: { type: ["string", "null"] }
+        discordUsername: { type: ["string", "null"] }
         tags:
           type: array
           items: { type: string }

@@ -124,14 +124,38 @@ function EditForm({
   onSave,
   saving,
 }: {
-  initial: { name: string; project?: string | null; company?: string | null; context?: string | null; tags: string[] };
-  onSave: (v: { name: string; project: string | null; company: string | null; context: string | null; tags: string[] }) => void;
+  initial: {
+    name: string;
+    project?: string | null;
+    company?: string | null;
+    context?: string | null;
+    email?: string | null;
+    telegramUsername?: string | null;
+    xUsername?: string | null;
+    discordUsername?: string | null;
+    tags: string[];
+  };
+  onSave: (v: {
+    name: string;
+    project: string | null;
+    company: string | null;
+    context: string | null;
+    email: string | null;
+    telegramUsername: string | null;
+    xUsername: string | null;
+    discordUsername: string | null;
+    tags: string[];
+  }) => void;
   saving: boolean;
 }) {
   const [name, setName] = useState(initial.name);
   const [project, setProject] = useState(initial.project ?? "");
   const [company, setCompany] = useState(initial.company ?? "");
   const [context, setContext] = useState(initial.context ?? "");
+  const [email, setEmail] = useState(initial.email ?? "");
+  const [telegramUsername, setTg] = useState(initial.telegramUsername ?? "");
+  const [xUsername, setX] = useState(initial.xUsername ?? "");
+  const [discordUsername, setDc] = useState(initial.discordUsername ?? "");
   const [tags, setTags] = useState((initial.tags ?? []).join(", "));
   return (
     <div className="space-y-2">
@@ -141,6 +165,17 @@ function EditForm({
         <Input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company" />
       </div>
       <Textarea value={context} onChange={(e) => setContext(e.target.value)} placeholder="Context" />
+      <div className="space-y-2 border rounded-md p-3 bg-muted/30">
+        <p className="text-xs text-muted-foreground">
+          Their handles — when this person posts on the Hub, we'll surface it as part of your network.
+        </p>
+        <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
+        <div className="grid grid-cols-3 gap-2">
+          <Input value={telegramUsername} onChange={(e) => setTg(e.target.value)} placeholder="Telegram @" />
+          <Input value={xUsername} onChange={(e) => setX(e.target.value)} placeholder="X / Twitter @" />
+          <Input value={discordUsername} onChange={(e) => setDc(e.target.value)} placeholder="Discord" />
+        </div>
+      </div>
       <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags (comma separated)" />
       <div className="flex gap-2 items-center flex-wrap">
         {tags.split(",").map((t) => t.trim()).filter(Boolean).map((t) => (
@@ -154,6 +189,10 @@ function EditForm({
             project: project || null,
             company: company || null,
             context: context || null,
+            email: email.trim() || null,
+            telegramUsername: telegramUsername.replace(/^@+/, "").trim() || null,
+            xUsername: xUsername.replace(/^@+/, "").trim() || null,
+            discordUsername: discordUsername.replace(/^@+/, "").trim() || null,
             tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           })
         }

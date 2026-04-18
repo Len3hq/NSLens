@@ -81,14 +81,19 @@ function AddPanel({ onClose }: { onClose: () => void }) {
   const [company, setCompany] = useState("");
   const [context, setContext] = useState("");
   const [tags, setTags] = useState("");
+  const [email, setEmail] = useState("");
+  const [telegramUsername, setTg] = useState("");
+  const [xUsername, setX] = useState("");
+  const [discordUsername, setDc] = useState("");
   const [text, setText] = useState("");
 
   const refresh = () => qc.invalidateQueries({ queryKey: getListContactsQueryKey() });
   const create = useCreateContact({
     mutation: {
       onSuccess: () => {
-        toast.success("Contact added");
+        toast.success("Contact added — we'll match Hub posts from this person.");
         setName(""); setProject(""); setCompany(""); setContext(""); setTags("");
+        setEmail(""); setTg(""); setX(""); setDc("");
         refresh();
       },
     },
@@ -145,6 +150,18 @@ function AddPanel({ onClose }: { onClose: () => void }) {
               <Input placeholder="Company" value={company} onChange={(e) => setCompany(e.target.value)} />
             </div>
             <Textarea placeholder="Context (where you met, what they're up to)" value={context} onChange={(e) => setContext(e.target.value)} />
+            <div className="space-y-2 border rounded-md p-3 bg-muted/30">
+              <p className="text-xs text-muted-foreground">
+                Add their handles so we can match them when they post on Network Brain — even before
+                you connect as friends.
+              </p>
+              <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <div className="grid grid-cols-3 gap-2">
+                <Input placeholder="Telegram @" value={telegramUsername} onChange={(e) => setTg(e.target.value)} />
+                <Input placeholder="X / Twitter @" value={xUsername} onChange={(e) => setX(e.target.value)} />
+                <Input placeholder="Discord" value={discordUsername} onChange={(e) => setDc(e.target.value)} />
+              </div>
+            </div>
             <Input placeholder="Tags (comma separated)" value={tags} onChange={(e) => setTags(e.target.value)} />
             <Button
               disabled={!name.trim() || create.isPending}
@@ -155,6 +172,10 @@ function AddPanel({ onClose }: { onClose: () => void }) {
                     project: project || null,
                     company: company || null,
                     context: context || null,
+                    email: email.trim() || null,
+                    telegramUsername: telegramUsername.replace(/^@+/, "").trim() || null,
+                    xUsername: xUsername.replace(/^@+/, "").trim() || null,
+                    discordUsername: discordUsername.replace(/^@+/, "").trim() || null,
                     tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
                   },
                 })

@@ -66,6 +66,10 @@ export const CreateContactBody = zod.object({
   project: zod.string().nullish(),
   context: zod.string().nullish(),
   company: zod.string().nullish(),
+  email: zod.string().nullish(),
+  telegramUsername: zod.string().nullish(),
+  xUsername: zod.string().nullish(),
+  discordUsername: zod.string().nullish(),
   tags: zod.array(zod.string()).optional(),
 });
 
@@ -107,6 +111,10 @@ export const UpdateContactBody = zod.object({
   project: zod.string().nullish(),
   context: zod.string().nullish(),
   company: zod.string().nullish(),
+  email: zod.string().nullish(),
+  telegramUsername: zod.string().nullish(),
+  xUsername: zod.string().nullish(),
+  discordUsername: zod.string().nullish(),
   tags: zod.array(zod.string()).optional(),
 });
 

@@ -14,5 +14,13 @@ export interface UpdateContactInput {
   context?: string | null;
   /** @nullable */
   company?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  telegramUsername?: string | null;
+  /** @nullable */
+  xUsername?: string | null;
+  /** @nullable */
+  discordUsername?: string | null;
   tags?: string[];
 }

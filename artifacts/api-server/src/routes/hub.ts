@@ -8,7 +8,7 @@ import {
   notificationsTable,
   type PostAttachment,
 } from "@workspace/db";
-import { desc, eq, ne } from "drizzle-orm";
+import { desc, eq, ne, and, or, inArray, sql } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { enqueueTelegram } from "../lib/telegramQueue";
 import { embedText, similarContacts } from "../lib/embeddings";
@@ -253,6 +253,53 @@ export async function fanOutPost(post: {
     .from(usersTable)
     .where(ne(usersTable.id, post.authorId));
 
+  // ---- Hard handle match: anyone whose CRM has a contact card with the
+  // post author's social handles or email is treated as a guaranteed match,
+  // even if they've never met the poster IRL or added them as a friend yet.
+  // This is what makes the contact form act as a "watch list."
+  const [author] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, post.authorId))
+    .limit(1);
+
+  const handleClauses = [];
+  if (author?.email) handleClauses.push(sql`lower(${contactsTable.email}) = lower(${author.email})`);
+  if (author?.telegramUsername)
+    handleClauses.push(sql`lower(${contactsTable.telegramUsername}) = lower(${author.telegramUsername})`);
+  if (author?.xUsername)
+    handleClauses.push(sql`lower(${contactsTable.xUsername}) = lower(${author.xUsername})`);
+  if (author?.discordUsername)
+    handleClauses.push(sql`lower(${contactsTable.discordUsername}) = lower(${author.discordUsername})`);
+  if (author?.username)
+    handleClauses.push(sql`lower(${contactsTable.telegramUsername}) = lower(${author.username})`);
+
+  // userId -> the contact row that matched, so we can name them in the message
+  const handleMatches = new Map<string, { contactName: string; via: string }>();
+  if (handleClauses.length > 0) {
+    const rows = await db
+      .select({
+        userId: contactsTable.userId,
+        contactName: contactsTable.name,
+        email: contactsTable.email,
+        telegramUsername: contactsTable.telegramUsername,
+        xUsername: contactsTable.xUsername,
+        discordUsername: contactsTable.discordUsername,
+      })
+      .from(contactsTable)
+      .where(and(ne(contactsTable.userId, post.authorId), or(...handleClauses)!));
+    for (const r of rows) {
+      if (handleMatches.has(r.userId)) continue;
+      const via =
+        author?.email && r.email?.toLowerCase() === author.email.toLowerCase() ? "email"
+        : author?.telegramUsername && r.telegramUsername?.toLowerCase() === author.telegramUsername.toLowerCase() ? "Telegram handle"
+        : author?.xUsername && r.xUsername?.toLowerCase() === author.xUsername.toLowerCase() ? "X handle"
+        : author?.discordUsername && r.discordUsername?.toLowerCase() === author.discordUsername.toLowerCase() ? "Discord handle"
+        : "username";
+      handleMatches.set(r.userId, { contactName: r.contactName, via });
+    }
+  }
+
   // Score every recipient first; we'll pick the top N for Telegram afterwards
   // so a single fan-out can never blast more than MAX_TELEGRAM_FANOUT DMs.
   type Match = {
@@ -265,8 +312,24 @@ export async function fanOutPost(post: {
 
   await Promise.all(
     others.map(async (u) => {
+      const handleHit = handleMatches.get(u.id);
       const candidates = await similarContacts(u.id, queryEmbedding, 6);
       const filtered = candidates.filter((c) => (c.similarity ?? 0) >= 0.2);
+
+      // Force-deliver if a contact card exactly matches the author's handles —
+      // even if the embedding match is weak. Skip the LLM check entirely.
+      if (handleHit) {
+        const title = `${post.authorName} just posted on the Hub`;
+        const reason = `${handleHit.contactName} (in your contacts via ${handleHit.via}) just posted: "${post.preview}"`;
+        const body = `${reason}\nThis is the same person you've saved in your CRM.`;
+        const [notif] = await db
+          .insert(notificationsTable)
+          .values({ userId: u.id, type: "hub_match", title, body, postId: post.id })
+          .returning();
+        matches.push({ user: u, notificationId: notif.id, reason, score: 1 });
+        return;
+      }
+
       if (!filtered.length) return;
 
       const contactSummary = filtered
