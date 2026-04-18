@@ -286,6 +286,26 @@ export const RunRemindersResponse = zod.object({
   ),
 });
 
+export const GetTelegramStatusResponse = zod.object({
+  linked: zod.boolean(),
+  chatId: zod.string().nullish(),
+  linkCode: zod.string().nullish(),
+  linkCodeExpiresAt: zod.coerce.date().nullish(),
+  botUsername: zod.string().nullish(),
+  botConfigured: zod.boolean(),
+});
+
+export const CreateTelegramLinkCodeResponse = zod.object({
+  linkCode: zod.string(),
+  expiresAt: zod.coerce.date(),
+  botUsername: zod.string().nullish(),
+  deepLink: zod.string().nullish(),
+});
+
+export const UnlinkTelegramResponse = zod.object({
+  ok: zod.boolean(),
+});
+
 export const ListPostsResponseItem = zod.object({
   id: zod.number(),
   authorId: zod.string(),

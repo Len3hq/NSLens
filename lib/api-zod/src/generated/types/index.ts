@@ -31,4 +31,7 @@ export * from "./me";
 export * from "./notification";
 export * from "./post";
 export * from "./runRemindersResult";
+export * from "./simpleOk";
+export * from "./telegramLinkCode";
+export * from "./telegramStatus";
 export * from "./updateContactInput";

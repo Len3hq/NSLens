@@ -17,7 +17,9 @@ const ROUTER_PROMPT = `You are an intent router for a personal CRM agent. Classi
 
 Reply with strict JSON: { "intent": "INGEST" | "QUERY" | "POST" | "UNKNOWN", "reason": "..." }`;
 
-async function classifyIntent(message: string): Promise<"INGEST" | "QUERY" | "POST" | "UNKNOWN"> {
+export type AgentIntent = "INGEST" | "QUERY" | "POST" | "UNKNOWN";
+
+async function classifyIntent(message: string): Promise<AgentIntent> {
   try {
     const completion = await openai.chat.completions.create({
       model: CHAT_MODEL,
@@ -38,44 +40,40 @@ async function classifyIntent(message: string): Promise<"INGEST" | "QUERY" | "PO
   }
 }
 
-router.post("/agent", requireAuth, async (req, res) => {
-  const { message } = req.body ?? {};
-  if (!message || typeof message !== "string") {
-    res.status(400).json({ error: "message is required" });
-    return;
-  }
+export async function runAgent(
+  userId: string,
+  message: string,
+): Promise<{ intent: AgentIntent; reply: string; result: Record<string, unknown> }> {
   const intent = await classifyIntent(message);
   if (intent === "INGEST") {
     const entities = await extractFromText(message);
-    const { created, updated } = await persistEntities(req.userId!, entities, message, "agent");
+    const { created, updated } = await persistEntities(userId, entities, message, "agent");
     const reply = entities.length
       ? `Saved ${created.length} new contact${created.length === 1 ? "" : "s"}${updated.length ? ` and updated ${updated.length}` : ""}: ${[...created, ...updated].map((c) => c.name).join(", ")}.`
       : `I couldn't find anyone to save in that message. Try mentioning specific names.`;
-    res.json({ intent, reply, result: { created, updated, rawExtraction: entities } });
-    return;
+    return { intent, reply, result: { created, updated, rawExtraction: entities } };
   }
   if (intent === "QUERY") {
-    const result = await answerWithMemory(req.userId!, message);
-    res.json({ intent, reply: result.answer, result: { sources: result.sources } });
-    return;
+    const result = await answerWithMemory(userId, message);
+    return { intent, reply: result.answer, result: { sources: result.sources } };
   }
   if (intent === "POST") {
     const [post] = await db
       .insert(postsTable)
-      .values({ authorId: req.userId!, content: message.trim() })
+      .values({ authorId: userId, content: message.trim() })
       .returning();
     const [author] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.id, req.userId!))
+      .where(eq(usersTable.id, userId))
       .limit(1);
     fanOutPost({
       id: post.id,
       authorId: post.authorId,
       content: post.content,
       authorName: author?.name ?? author?.email ?? "Someone",
-    }).catch((err) => req.log?.error({ err }, "agent fan-out failed"));
-    res.json({
+    }).catch(() => {});
+    return {
       intent,
       reply: `Posted to the Founders Hub. Your network will be notified if relevant.`,
       result: {
@@ -85,14 +83,24 @@ router.post("/agent", requireAuth, async (req, res) => {
         content: post.content,
         createdAt: post.createdAt,
       },
-    });
+    };
+  }
+  return {
+    intent: "UNKNOWN",
+    reply:
+      "I'm not sure what you want me to do. Try giving me notes about people you met, asking a question about your network, or saying 'post to hub: ...'.",
+    result: {},
+  };
+}
+
+router.post("/agent", requireAuth, async (req, res) => {
+  const { message } = req.body ?? {};
+  if (!message || typeof message !== "string") {
+    res.status(400).json({ error: "message is required" });
     return;
   }
-  res.json({
-    intent: "UNKNOWN",
-    reply: "I'm not sure what you want me to do. Try giving me notes about people you met, asking a question about your network, or saying 'post to hub: ...'.",
-    result: {},
-  });
+  const result = await runAgent(req.userId!, message);
+  res.json(result);
 });
 
 export default router;

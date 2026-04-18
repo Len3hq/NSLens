@@ -3,6 +3,7 @@ import { requireAuth } from "../lib/auth";
 import { db, postsTable, usersTable, contactsTable, notificationsTable } from "@workspace/db";
 import { desc, eq, ne, ilike, or, sql, and } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
+import { sendTelegramMessage } from "../lib/telegram";
 
 const router: IRouter = Router();
 
@@ -88,13 +89,18 @@ export async function fanOutPost(post: { id: number; authorId: string; content: 
       // fall through
     }
     if (relevant) {
+      const title = `New post matches your network: "${post.content.slice(0, 60)}${post.content.length > 60 ? "…" : ""}"`;
+      const body = `${reason || "This post might be relevant to people in your network."}\nMatched contacts: ${candidates.map((c) => c.name).join(", ")}`;
       await db.insert(notificationsTable).values({
         userId: u.id,
         type: "hub_match",
-        title: `New post matches your network: "${post.content.slice(0, 60)}${post.content.length > 60 ? "…" : ""}"`,
-        body: `${reason || "This post might be relevant to people in your network."}\nMatched contacts: ${candidates.map((c) => c.name).join(", ")}`,
+        title,
+        body,
         postId: post.id,
       });
+      if (u.telegramChatId) {
+        sendTelegramMessage(u.telegramChatId, `🤝 ${title}\n${body}`).catch(() => {});
+      }
     }
   }));
 }

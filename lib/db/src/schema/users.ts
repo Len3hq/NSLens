@@ -5,6 +5,11 @@ export const usersTable = pgTable("users", {
   email: text("email"),
   name: text("name"),
   reminderDays: integer("reminder_days").notNull().default(21),
+  telegramChatId: text("telegram_chat_id"),
+  telegramLinkCode: text("telegram_link_code"),
+  telegramLinkCodeExpiresAt: timestamp("telegram_link_code_expires_at", {
+    withTimezone: true,
+  }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

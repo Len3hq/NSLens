@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
 import { db, contactsTable, notificationsTable, usersTable } from "@workspace/db";
 import { and, eq, isNull, or, lt } from "drizzle-orm";
+import { sendTelegramMessage } from "../lib/telegram";
 
 const router: IRouter = Router();
 
@@ -51,6 +52,12 @@ export async function evaluateReminders(userId: string) {
       .returning();
     created.push(n);
     flagged++;
+    if (user?.telegramChatId) {
+      sendTelegramMessage(
+        user.telegramChatId,
+        `🔔 ${n.title}\n${n.body}`,
+      ).catch(() => {});
+    }
   }
   return { evaluated: stale.length, flagged, notifications: created };
 }

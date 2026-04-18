@@ -177,6 +177,32 @@ export interface CreatePostInput {
   content: string;
 }
 
+export interface TelegramStatus {
+  linked: boolean;
+  /** @nullable */
+  chatId?: string | null;
+  /** @nullable */
+  linkCode?: string | null;
+  /** @nullable */
+  linkCodeExpiresAt?: string | null;
+  /** @nullable */
+  botUsername?: string | null;
+  botConfigured: boolean;
+}
+
+export interface TelegramLinkCode {
+  linkCode: string;
+  expiresAt: string;
+  /** @nullable */
+  botUsername?: string | null;
+  /** @nullable */
+  deepLink?: string | null;
+}
+
+export interface SimpleOk {
+  ok: boolean;
+}
+
 export interface Dashboard {
   contactCount: number;
   interactionCount: number;

@@ -17,6 +17,7 @@ tags:
   - name: agent
   - name: hub
   - name: dashboard
+  - name: telegram
 
 paths:
   /healthz:
@@ -275,6 +276,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/RunRemindersResult"
 
+  /me/telegram:
+    get:
+      operationId: getTelegramStatus
+      tags: [telegram]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramStatus"
+  /me/telegram/link:
+    post:
+      operationId: createTelegramLinkCode
+      tags: [telegram]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramLinkCode"
+  /me/telegram/unlink:
+    post:
+      operationId: unlinkTelegram
+      tags: [telegram]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleOk"
+
   /hub:
     get:
       operationId: listPosts
@@ -508,6 +543,32 @@ components:
       properties:
         content: { type: string }
       required: [content]
+
+    TelegramStatus:
+      type: object
+      properties:
+        linked: { type: boolean }
+        chatId: { type: ["string", "null"] }
+        linkCode: { type: ["string", "null"] }
+        linkCodeExpiresAt: { type: ["string", "null"], format: date-time }
+        botUsername: { type: ["string", "null"] }
+        botConfigured: { type: boolean }
+      required: [linked, botConfigured]
+
+    TelegramLinkCode:
+      type: object
+      properties:
+        linkCode: { type: string }
+        expiresAt: { type: string, format: date-time }
+        botUsername: { type: ["string", "null"] }
+        deepLink: { type: ["string", "null"] }
+      required: [linkCode, expiresAt]
+
+    SimpleOk:
+      type: object
+      properties:
+        ok: { type: boolean }
+      required: [ok]
 
     Dashboard:
       type: object
