@@ -1,1 +1,66 @@
-[]
+[
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000001",
+    "position": 1,
+    "filepath": "src/pages/slides/Title.tsx",
+    "title": "Your relationships, in focus",
+    "description": "Hero title slide introducing NS Lens.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000002",
+    "position": 2,
+    "filepath": "src/pages/slides/Problem.tsx",
+    "title": "The problem",
+    "description": "We meet hundreds, remember dozens, follow up with none.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000003",
+    "position": 3,
+    "filepath": "src/pages/slides/Solution.tsx",
+    "title": "One brain for your network",
+    "description": "Four pillars: capture, remember, act, ask.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000004",
+    "position": 4,
+    "filepath": "src/pages/slides/HowItWorks.tsx",
+    "title": "How it works",
+    "description": "Three-step flow: add a contact, log every touch, ask anything.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000005",
+    "position": 5,
+    "filepath": "src/pages/slides/TelegramFlow.tsx",
+    "title": "Inside Telegram",
+    "description": "Phone mockup of the NS Lens Telegram bot capturing and answering.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000006",
+    "position": 6,
+    "filepath": "src/pages/slides/FoundersHub.tsx",
+    "title": "Founders Hub fan-out",
+    "description": "Post once, get matched to the right people in private networks.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000007",
+    "position": 7,
+    "filepath": "src/pages/slides/Architecture.tsx",
+    "title": "Under the hood",
+    "description": "Architecture diagram and tech stack.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000008",
+    "position": 8,
+    "filepath": "src/pages/slides/Closing.tsx",
+    "title": "Don't lose another conversation",
+    "description": "Closing slide with brand lockup and CTAs.",
+    "speakerNotes": ""
+  }
+]
