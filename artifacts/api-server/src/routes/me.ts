@@ -1,7 +1,17 @@
 import { Router, type IRouter } from "express";
+import { clerkClient } from "@clerk/express";
 import { requireAuth } from "../lib/auth";
-import { db, usersTable } from "@workspace/db";
-import { and, eq, ne } from "drizzle-orm";
+import {
+  db,
+  usersTable,
+  contactsTable,
+  interactionsTable,
+  notificationsTable,
+  postsTable,
+  friendshipsTable,
+  followUpsTable,
+} from "@workspace/db";
+import { and, eq, ne, or } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -80,6 +90,52 @@ router.patch("/me", requireAuth, async (req, res) => {
     .where(eq(usersTable.id, req.userId!))
     .limit(1);
   res.json(projectMe(fresh, req.userId!));
+});
+
+// Permanently delete the calling user. Removes them from Clerk first (which
+// revokes every active session and prevents future sign-in), then cascades
+// the local data so we don't leave orphaned rows behind.
+router.delete("/me", requireAuth, async (req, res) => {
+  const userId = req.userId!;
+
+  // 1. Delete in Clerk. This is the only thing that actually invalidates
+  //    sessions and blocks future logins — without it the user can keep
+  //    signing in via magic link.
+  try {
+    await clerkClient.users.deleteUser(userId);
+  } catch (err: unknown) {
+    const status = (err as { status?: number })?.status;
+    if (status !== 404 && status !== 410) {
+      req.log?.error({ err }, "clerk user delete failed");
+      res.status(502).json({ error: "Could not delete account with auth provider" });
+      return;
+    }
+    // 404/410 means already gone in Clerk — fall through and clean up locally.
+  }
+
+  // 2. Cascade local data. Drop everything tied to this user across the app.
+  try {
+    await db.delete(notificationsTable).where(eq(notificationsTable.userId, userId));
+    await db.delete(interactionsTable).where(eq(interactionsTable.userId, userId));
+    await db.delete(followUpsTable).where(eq(followUpsTable.userId, userId));
+    await db.delete(contactsTable).where(eq(contactsTable.userId, userId));
+    await db.delete(postsTable).where(eq(postsTable.authorId, userId));
+    await db
+      .delete(friendshipsTable)
+      .where(
+        or(
+          eq(friendshipsTable.userId, userId),
+          eq(friendshipsTable.friendUserId, userId),
+        ),
+      );
+    await db.delete(usersTable).where(eq(usersTable.id, userId));
+  } catch (err) {
+    req.log?.error({ err }, "local user cleanup failed");
+    res.status(500).json({ error: "Account removed from auth, but local cleanup failed" });
+    return;
+  }
+
+  res.json({ ok: true });
 });
 
 export default router;
