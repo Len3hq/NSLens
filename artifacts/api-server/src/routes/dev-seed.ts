@@ -7,17 +7,39 @@ import {
   notificationsTable,
   postsTable,
   usersTable,
+  type PostAttachment,
 } from "@workspace/db";
 import { and, eq, inArray, like } from "drizzle-orm";
-import { fanOutPost } from "./hub";
+import { createHubPost } from "./hub";
 import { evaluateReminders } from "./reminders";
 import { backfillEmbeddings } from "../lib/embeddings";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { downloadFromUrl } from "../lib/telegram";
 
 const router: IRouter = Router();
 
 // Synthetic peer users (id prefix used so we can easily wipe them).
 const PEER_PREFIX = "seed_peer_";
-const PEERS = [
+
+// Each post can have an attachments[] alongside the text body. Image entries
+// reference public sources that we'll download once and re-upload to our own
+// object storage during seeding. Link entries are scraped for og metadata.
+type SeedPost = {
+  content: string;
+  attachments?: Array<
+    | { kind: "image"; sourceUrl: string; mimeType?: string; caption?: string }
+    | { kind: "video"; sourceUrl: string; mimeType?: string; caption?: string }
+    | { kind: "link"; url: string }
+  >;
+};
+
+const PEERS: Array<{
+  id: string;
+  name: string;
+  email: string;
+  contacts: Array<{ name: string; project: string; company: string; context: string; tags: string[] }>;
+  posts: SeedPost[];
+}> = [
   {
     id: `${PEER_PREFIX}aria`,
     name: "Aria Chen",
@@ -28,7 +50,25 @@ const PEERS = [
       { name: "Ethan Park", project: "developer tools agency", company: "Park Labs", context: "Helps YC startups ship MVPs", tags: ["devtools", "agency"] },
     ],
     posts: [
-      "Looking for a CTO with infra experience to join my pre-seed. Building agentic memory systems for sales teams. DM me.",
+      {
+        content:
+          "Looking for a CTO with infra experience to join my pre-seed. Building agentic memory systems for sales teams. DM me.",
+        attachments: [
+          { kind: "link", url: "https://www.ycombinator.com/library/4A-how-to-find-a-cofounder" },
+        ],
+      },
+      {
+        content: "Sneak peek of our memory graph UI. Curious how this lands with infra founders 👇",
+        attachments: [
+          {
+            kind: "image",
+            sourceUrl:
+              "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80&fm=jpg",
+            mimeType: "image/jpeg",
+            caption: "Dashboard showing connected entities and recent activity",
+          },
+        ],
+      },
     ],
   },
   {
@@ -40,7 +80,21 @@ const PEERS = [
       { name: "Tomás Alvarez", project: "developer tools for AI agents", company: "Independent", context: "Open-source contributor, looking for cofounders", tags: ["devtools", "ai", "open-source"] },
     ],
     posts: [
-      "Anyone here built evals for an LLM router? We're seeing weird drift on classification accuracy and could use a second pair of eyes.",
+      {
+        content:
+          "Anyone here built evals for an LLM router? We're seeing weird drift on classification accuracy and could use a second pair of eyes.",
+        attachments: [
+          { kind: "link", url: "https://github.com/openai/evals" },
+        ],
+      },
+      {
+        content:
+          "Reading list this week — chunking strategies for long-doc RAG. Recommendations welcome.",
+        attachments: [
+          { kind: "link", url: "https://www.pinecone.io/learn/chunking-strategies/" },
+          { kind: "link", url: "https://arxiv.org/abs/2312.10997" },
+        ],
+      },
     ],
   },
 ];
@@ -140,10 +194,61 @@ const USER_CONTACTS = [
   },
 ];
 
-const USER_POSTS = [
-  "Looking for a design partner who's building B2B sales tooling. We just shipped a memory layer for outbound reps and want feedback from teams >10 AEs.",
-  "Quick ask — anyone know a great fractional CTO with Postgres + AI infra experience? Backing a stealth team, intros appreciated.",
+const USER_POSTS: SeedPost[] = [
+  {
+    content:
+      "Looking for a design partner who's building B2B sales tooling. We just shipped a memory layer for outbound reps and want feedback from teams >10 AEs.",
+    attachments: [
+      { kind: "link", url: "https://www.lennysnewsletter.com/p/finding-design-partners" },
+    ],
+  },
+  {
+    content:
+      "Quick ask — anyone know a great fractional CTO with Postgres + AI infra experience? Backing a stealth team, intros appreciated.",
+  },
+  {
+    content: "Mood board for our new contact-detail page. Going for calm, info-dense, no clutter.",
+    attachments: [
+      {
+        kind: "image",
+        sourceUrl:
+          "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=1200&q=80&fm=jpg",
+        mimeType: "image/jpeg",
+        caption: "Calm minimalist workspace inspiration",
+      },
+    ],
+  },
 ];
+
+// Convert a SeedPost's attachments into runtime PostAttachment[].
+// Image / video sources are downloaded and pushed to our object storage so the
+// resulting post objectPath is served from /api/storage/objects/...
+async function materializeAttachments(
+  post: SeedPost,
+  storage: ObjectStorageService,
+): Promise<PostAttachment[]> {
+  const out: PostAttachment[] = [];
+  for (const a of post.attachments ?? []) {
+    if (a.kind === "link") {
+      out.push({ type: "link", url: a.url });
+      continue;
+    }
+    // image | video — fetch + upload
+    const data = await downloadFromUrl(a.sourceUrl);
+    if (!data) {
+      // Fall back to a link attachment so the post still has something to render.
+      out.push({ type: "link", url: a.sourceUrl });
+      continue;
+    }
+    const mime =
+      data.contentType !== "application/octet-stream"
+        ? data.contentType
+        : a.mimeType ?? (a.kind === "image" ? "image/jpeg" : "video/mp4");
+    const objectPath = await storage.uploadBuffer(data.buffer, mime);
+    out.push({ type: a.kind, objectPath, mimeType: mime, caption: a.caption });
+  }
+  return out;
+}
 
 router.post("/dev/seed", requireAuth, async (req, res) => {
   const userId = req.userId!;
@@ -211,38 +316,23 @@ router.post("/dev/seed", requireAuth, async (req, res) => {
     summary.interactions++;
   }
 
-  // 3. Seed peer posts so the active user sees Hub matches
+  const storage = new ObjectStorageService();
+
+  // 3. Seed peer posts so the active user sees Hub matches.
+  //    createHubPost handles attachment enrichment + semantic fan-out internally.
   for (const peer of PEERS) {
-    for (const content of peer.posts) {
-      const [post] = await db
-        .insert(postsTable)
-        .values({ authorId: peer.id, content })
-        .returning();
+    for (const sp of peer.posts) {
+      const attachments = await materializeAttachments(sp, storage);
+      await createHubPost(peer.id, sp.content, attachments);
       summary.peerPosts++;
-      // Fan-out so the active user gets relevant notifications
-      await fanOutPost({
-        id: post.id,
-        authorId: post.authorId,
-        content: post.content,
-        authorName: peer.name,
-      });
     }
   }
 
   // 4. Seed the active user's own posts (fan out to peers)
-  const [me] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  for (const content of USER_POSTS) {
-    const [post] = await db
-      .insert(postsTable)
-      .values({ authorId: userId, content })
-      .returning();
+  for (const sp of USER_POSTS) {
+    const attachments = await materializeAttachments(sp, storage);
+    await createHubPost(userId, sp.content, attachments);
     summary.posts++;
-    await fanOutPost({
-      id: post.id,
-      authorId: post.authorId,
-      content: post.content,
-      authorName: me?.name ?? me?.email ?? "You",
-    });
   }
 
   // 5. Embed all newly seeded contacts + interactions (idempotent — only fills nulls).
