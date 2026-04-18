@@ -9,6 +9,30 @@ import { toast } from "sonner";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+function generateStrongPassword(): string {
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const digits = "0123456789";
+  const symbols = "!@#$%^&*()-_=+";
+  const all = lower + upper + digits + symbols;
+  const bytes = new Uint32Array(32);
+  crypto.getRandomValues(bytes);
+  const pick = (set: string, i: number) => set[bytes[i]! % set.length]!;
+  const chars: string[] = [
+    pick(lower, 0),
+    pick(upper, 1),
+    pick(digits, 2),
+    pick(symbols, 3),
+  ];
+  for (let i = 4; i < 28; i++) chars.push(pick(all, i));
+  // Fisher–Yates shuffle to avoid predictable positions
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = bytes[i]! % (i + 1);
+    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+  }
+  return chars.join("");
+}
+
 type Phase = "enter" | "sending" | "code";
 type Mode = "signIn" | "signUp";
 
@@ -83,9 +107,12 @@ export default function SignInWithLink() {
       // fall through → sign-up
     }
 
-    // 2. New user — sign-up
+    // 2. New user — sign-up. Generate a strong random password to satisfy Clerk's
+    // requirements; users never see or need it because they always sign in via
+    // the emailed code.
     try {
-      await signUp.create({ emailAddress });
+      const password = generateStrongPassword();
+      await signUp.create({ emailAddress, password });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setMode("signUp");
       setPhase("code");
@@ -141,6 +168,7 @@ export default function SignInWithLink() {
             else if (f === "last_name") updates.lastName = " ";
             else if (f === "username")
               updates.username = `user_${Math.random().toString(36).slice(2, 9)}`;
+            else if (f === "password") updates.password = generateStrongPassword();
           }
           if (Object.keys(updates).length) {
             signUp = await signUp.update(updates);
