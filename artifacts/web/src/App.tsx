@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
+import { ClerkProvider, Show, useClerk } from "@clerk/react";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "sonner";
@@ -14,6 +14,8 @@ import Chat from "@/pages/Chat";
 import AgentPage from "@/pages/Agent";
 import Hub from "@/pages/Hub";
 import Notifications from "@/pages/Notifications";
+import SignInWithLink from "@/pages/SignInWithLink";
+import VerifyLink from "@/pages/VerifyLink";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -77,26 +79,6 @@ const clerkAppearance = {
   },
 };
 
-function SignInPage() {
-  // To update login providers, app branding, or OAuth settings use the Auth
-  // pane in the workspace toolbar. More information can be found in the Replit docs.
-  return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
-    </div>
-  );
-}
-
-function SignUpPage() {
-  // To update login providers, app branding, or OAuth settings use the Auth
-  // pane in the workspace toolbar. More information can be found in the Replit docs.
-  return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
-    </div>
-  );
-}
-
 function HomeRedirect() {
   return (
     <>
@@ -148,8 +130,10 @@ function ClerkProviderWithRoutes() {
           <ClerkQueryClientCacheInvalidator />
           <Switch>
             <Route path="/" component={HomeRedirect} />
-            <Route path="/sign-in/*?" component={SignInPage} />
-            <Route path="/sign-up/*?" component={SignUpPage} />
+            <Route path="/sign-in" component={SignInWithLink} />
+            <Route path="/sign-up"><Redirect to="/sign-in" /></Route>
+            <Route path="/verify" component={VerifyLink} />
+            <Route path="/verify/*?" component={VerifyLink} />
             <Route path="/app"><AppArea><Dashboard /></AppArea></Route>
             <Route path="/app/contacts"><AppArea><Contacts /></AppArea></Route>
             <Route path="/app/contacts/:id"><AppArea><ContactDetail /></AppArea></Route>
