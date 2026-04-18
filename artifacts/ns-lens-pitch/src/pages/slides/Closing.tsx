@@ -42,11 +42,11 @@ export default function Closing() {
       <div className="absolute bottom-[6vh] left-[6vw] right-[6vw] flex items-end justify-between border-t border-line pt-[2.5vh]">
         <div>
           <div className="text-[0.9vw] uppercase tracking-[0.3em] text-muted">Try it now</div>
-          <div className="mt-[0.6vh] font-display text-[1.6vw] font-semibold tracking-tight">nslens.app</div>
+          <div className="mt-[0.6vh] font-display text-[1.6vw] font-semibold tracking-tight">nslens.replit.app</div>
         </div>
         <div>
           <div className="text-[0.9vw] uppercase tracking-[0.3em] text-muted">Talk to the bot</div>
-          <div className="mt-[0.6vh] font-display text-[1.6vw] font-semibold tracking-tight">@NSLensBot</div>
+          <div className="mt-[0.6vh] font-display text-[1.6vw] font-semibold tracking-tight">@NetworkLens_bot</div>
         </div>
         <div className="text-right">
           <div className="text-[0.9vw] uppercase tracking-[0.3em] text-muted">Built at</div>
