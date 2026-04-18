@@ -268,7 +268,7 @@ export default function Hub() {
           <p className="text-sm text-muted-foreground">No posts yet. Be the first.</p>
         ) : (
           posts.map((p) => (
-            <Card key={p.id}>
+            <Card key={p.id} id={`post-${p.id}`} className="scroll-mt-20">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div className="font-medium">{p.authorName}</div>

@@ -17,6 +17,7 @@ import Hub from "@/pages/Hub";
 import Notifications from "@/pages/Notifications";
 import SignInWithLink from "@/pages/SignInWithLink";
 import VerifyLink from "@/pages/VerifyLink";
+import PublicPost from "@/pages/PublicPost";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -154,6 +155,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/sign-up"><Redirect to="/sign-in" /></Route>
             <Route path="/verify" component={VerifyLink} />
             <Route path="/verify/*?" component={VerifyLink} />
+            <Route path="/hub/p/:id" component={PublicPost} />
             <Route path="/app"><AppArea><Dashboard /></AppArea></Route>
             <Route path="/app/contacts"><AppArea><Contacts /></AppArea></Route>
             <Route path="/app/contacts/:id"><AppArea><ContactDetail /></AppArea></Route>

@@ -17,6 +17,42 @@ const router: IRouter = Router();
 
 // ---------- Public read ----------
 
+// Public, unauthenticated read of a single post — used by Telegram fan-out
+// deep links so recipients can preview the post without logging in.
+router.get("/hub/public/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "bad id" });
+    return;
+  }
+  const [row] = await db
+    .select({
+      id: postsTable.id,
+      authorId: postsTable.authorId,
+      content: postsTable.content,
+      attachments: postsTable.attachments,
+      createdAt: postsTable.createdAt,
+      authorName: usersTable.name,
+      authorEmail: usersTable.email,
+    })
+    .from(postsTable)
+    .leftJoin(usersTable, eq(usersTable.id, postsTable.authorId))
+    .where(eq(postsTable.id, id))
+    .limit(1);
+  if (!row) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  res.json({
+    id: row.id,
+    authorId: row.authorId,
+    content: row.content,
+    attachments: row.attachments ?? [],
+    createdAt: row.createdAt,
+    authorName: row.authorName ?? row.authorEmail ?? "Anonymous",
+  });
+});
+
 router.get("/hub", requireAuth, async (_req, res) => {
   const rows = await db
     .select({
@@ -191,6 +227,20 @@ export function buildSearchableText(
 const RELEVANCE_PROMPT = `You decide whether a public post from one founder is relevant to specific contacts in another founder's network. Consider both the post content and any image/link descriptions.
 Reply with strict JSON: { "relevant": true|false, "reason": "...", "matchedNames": ["Name", ...] }. Only true if the post clearly aligns with one or more contacts (similar project, complementary need, shared topic). Keep "reason" to one sentence written directly to the recipient (the network owner), e.g. "Sara at Anthropic is building agents — this RAG demo could be useful to her."`;
 
+// Cap how many recipients get a Telegram DM for a single fan-out so people
+// with broadly-relevant networks don't get spammed. Everyone still gets the
+// in-app notification; only the top N by relevance score get a push.
+const MAX_TELEGRAM_FANOUT = 3;
+
+function publicAppUrl(path: string): string {
+  const base =
+    process.env.PUBLIC_APP_URL ||
+    process.env.PUBLIC_API_URL ||
+    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "") ||
+    "http://localhost:5000";
+  return `${base.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export async function fanOutPost(post: {
   id: number;
   authorId: string;
@@ -208,11 +258,19 @@ export async function fanOutPost(post: {
     .from(usersTable)
     .where(ne(usersTable.id, post.authorId));
 
+  // Score every recipient first; we'll pick the top N for Telegram afterwards
+  // so a single fan-out can never blast more than MAX_TELEGRAM_FANOUT DMs.
+  type Match = {
+    user: (typeof others)[number];
+    title: string;
+    body: string;
+    score: number;
+  };
+  const matches: Match[] = [];
+
   await Promise.all(
     others.map(async (u) => {
-      // Pull the top semantically-similar contacts in this user's network.
       const candidates = await similarContacts(u.id, queryEmbedding, 6);
-      // Apply a soft floor so totally unrelated networks don't get noise.
       const filtered = candidates.filter((c) => (c.similarity ?? 0) >= 0.2);
       if (!filtered.length) return;
 
@@ -253,6 +311,8 @@ export async function fanOutPost(post: {
         : filtered.slice(0, 3).map((c) => c.name);
       const title = `New post matches your network: "${post.preview}"`;
       const body = `${reason || "This might be relevant to people you know."}\nMatched contacts: ${matched.join(", ")}`;
+
+      // Always create the in-app notification — that's not noisy.
       await db.insert(notificationsTable).values({
         userId: u.id,
         type: "hub_match",
@@ -260,10 +320,31 @@ export async function fanOutPost(post: {
         body,
         postId: post.id,
       });
-      if (u.telegramChatId) {
-        sendTelegramMessage(u.telegramChatId, `🤝 ${title}\n${body}`).catch(() => {});
-      }
+
+      matches.push({
+        user: u,
+        title,
+        body,
+        score: filtered[0]?.similarity ?? 0,
+      });
     }),
+  );
+
+  // Send Telegram DMs only to the top N most-relevant linked recipients.
+  // The /hub/p/:id route is public — no login required to read the post.
+  const postUrl = publicAppUrl(`/hub/p/${post.id}`);
+  const telegramRecipients = matches
+    .filter((m) => m.user.telegramChatId)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_TELEGRAM_FANOUT);
+
+  await Promise.all(
+    telegramRecipients.map((m) =>
+      sendTelegramMessage(
+        m.user.telegramChatId!,
+        `🤝 ${m.title}\n${m.body}\n\nRead the post: ${postUrl}`,
+      ).catch(() => {}),
+    ),
   );
 }
 
