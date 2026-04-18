@@ -111,13 +111,17 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen flex bg-background text-foreground">
       {/* Desktop sidebar (hidden on mobile/tablet) */}
       <aside className="hidden lg:flex w-64 shrink-0 border-r border-sidebar-border bg-sidebar/70 glass flex-col sticky top-0 h-screen">
-        <div className="px-5 pt-5 pb-4 flex items-center gap-2.5">
+        <Link
+          href="/app"
+          aria-label="NS Lens — go to home"
+          className="px-5 pt-5 pb-4 flex items-center gap-2.5 rounded-md hover:bg-secondary/40 transition-colors mx-2 mt-1"
+        >
           <LensMark className="w-7 h-7" />
           <div className="flex flex-col leading-tight">
             <span className="font-semibold tracking-tight text-[15px]">NS Lens</span>
             <span className="text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground">your network, in focus</span>
           </div>
-        </div>
+        </Link>
         {navList()}
         <div className="p-3 border-t border-sidebar-border">{userBlock}</div>
       </aside>
@@ -133,9 +137,16 @@ export function Layout({ children }: { children: ReactNode }) {
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-72 bg-sidebar border-sidebar-border flex flex-col">
               <SheetHeader className="px-5 pt-5 pb-2 text-left">
-                <SheetTitle className="flex items-center gap-2.5">
-                  <LensMark className="w-7 h-7" />
-                  <span className="font-semibold tracking-tight">NS Lens</span>
+                <SheetTitle asChild>
+                  <Link
+                    href="/app"
+                    onClick={() => setDrawerOpen(false)}
+                    aria-label="NS Lens — go to home"
+                    className="flex items-center gap-2.5"
+                  >
+                    <LensMark className="w-7 h-7" />
+                    <span className="font-semibold tracking-tight">NS Lens</span>
+                  </Link>
                 </SheetTitle>
               </SheetHeader>
               {navList(() => setDrawerOpen(false))}

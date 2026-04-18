@@ -11,10 +11,14 @@ export default function Home() {
       {/* Top bar */}
       <header className="sticky top-0 z-30 glass border-b border-border/60">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <Link
+            href="/"
+            aria-label="NS Lens — go to home"
+            className="flex items-center gap-2.5 rounded-md hover:opacity-80 transition-opacity"
+          >
             <LensMark className="w-7 h-7" />
             <span className="font-semibold tracking-tight text-[15px]">NS Lens</span>
-          </div>
+          </Link>
           <nav className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
             <a href={`${basePath}#features`} className="hover:text-foreground transition-colors">Features</a>
             <a href={`${basePath}#how`} className="hover:text-foreground transition-colors">How it works</a>
