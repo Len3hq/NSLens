@@ -85,18 +85,7 @@ export default function SignInWithLink() {
 
     // 2. New user — sign-up
     try {
-      const localPart = emailAddress.split("@")[0] ?? "";
-      const friendly =
-        localPart
-          .split(/[._-]+/)
-          .filter(Boolean)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ") || "Member";
-      await signUp.create({
-        emailAddress,
-        firstName: friendly,
-        lastName: " ",
-      });
+      await signUp.create({ emailAddress });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setMode("signUp");
       setPhase("code");
