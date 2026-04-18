@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, index, vector } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, index, vector, boolean } from "drizzle-orm/pg-core";
 
 export const contactsTable = pgTable(
   "contacts",
@@ -14,6 +14,7 @@ export const contactsTable = pgTable(
     xUsername: text("x_username"),
     discordUsername: text("discord_username"),
     tags: text("tags").array().notNull().default([]),
+    starred: boolean("starred").default(false).notNull(),
     lastInteractionAt: timestamp("last_interaction_at", { withTimezone: true }),
     embedding: vector("embedding", { dimensions: 384 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

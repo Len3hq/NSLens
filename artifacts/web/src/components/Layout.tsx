@@ -14,11 +14,13 @@ import {
   Bell,
   LogOut,
   UserCircle,
+  CalendarClock,
 } from "lucide-react";
 
 const NAV = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard },
   { to: "/app/contacts", label: "Contacts", icon: Users },
+  { to: "/app/followups", label: "Follow-ups", icon: CalendarClock },
   { to: "/app/chat", label: "Memory Chat", icon: MessageCircle },
   { to: "/app/agent", label: "Agent", icon: Sparkles },
   { to: "/app/hub", label: "Founders Hub", icon: Megaphone },

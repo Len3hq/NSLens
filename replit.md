@@ -35,10 +35,18 @@ Personal CRM web app: capture every person you meet, ask your network anything, 
 - Inbound `/api/telegram/webhook` looks up the user by chat id, then routes free text through the same `runAgent()` used by the in-app agent. Commands: `/start`, `/help`, `/reminders`, `/unlink`.
 - Outbound: `evaluateReminders` and Hub fan-out queue Telegram messages via `enqueueTelegram(userId, notificationId, shortText)` in `lib/telegramQueue.ts`. The queue caps deliveries at `TELEGRAM_BATCH_SIZE` (3) per flush; if more notifications are pending, the bot sends a single conversational prompt ("You have N more updates. Reply YES to see them.") and sets `users.telegramAwaitingMore=true`. The webhook calls `handleTelegramQueueReply` first on every text message — YES/Y/sure/etc flushes another batch, NO/STOP clears the queue and silences further pushes. Notification rows persist `telegramText`, `telegramQueued`, and `telegramSentAt`. Each Hub fan-out short text is one line + a public post link `${PUBLIC_APP_URL || REPLIT_DEV_DOMAIN}/hub/p/<id>` (no auth required).
 
+## Standard CRM features (follow-ups, tags, priority, calendar)
+
+- **Follow-ups**: `lib/db/src/schema/followups.ts` `followUpsTable(id, userId, contactId, dueAt, note, source, completedAt)`. CRUD at `/api/followups` + `/api/followups/:id/complete` + `/api/contacts/:id/followups`. UI: `/app/followups` lists open + completed, ContactDetail has an inline `FollowUpsCard`. `evaluateReminders` also flags due follow-ups as notifications using a per-followup dedupe key `followup_due:<id>` so multiple due items per contact each surface independently.
+- **AI tag suggestion**: `artifacts/api-server/src/lib/aiTags.ts` `suggestTags(contact)`. Auto-runs in the background on contact create when no tags supplied (atomic guard: only sets if tags array still empty, so a quick user edit isn't clobbered). Manual endpoint `POST /api/contacts/:id/suggest-tags` returns suggestions; the ContactDetail "Suggest tags" button merges them with existing tags.
+- **Priority / "who matters"**: `GET /api/contacts/priority` ranks contacts by `(starred * 3) + log(interaction_count) + recency_decay(90 days)` in SQL. `POST /api/contacts/:id/star` toggles `contactsTable.starred` (boolean). Star button on ContactDetail.
+- **Calendar (ICS subscribe)**: per-user opaque token in `usersTable.calendarFeedToken` (24-byte base64url). `GET /api/me/calendar` issues/returns `webcal://...` and `https://...` subscribe URLs; `POST /api/me/calendar/rotate` invalidates the old token. Public `GET /api/calendar/<token>.ics` returns a `text/calendar` feed of all the user's follow-ups (UID `followup-<id>@network-brain`, 30-min default duration). Subscribe in Google/Apple/Outlook — read-only sync, no OAuth.
+- **Telegram extensions**: agent intent router classifies into INGEST | QUERY | POST | FOLLOWUP_SET | FOLLOWUP_LIST | PRIORITY | TAG_LIST | UNKNOWN. The webhook adds slash commands `/followups`, `/priority`, `/tag <name>` that just route into `runAgent()` so wording/casing variations all work.
+
 ## Routes
 
-- Frontend: `/` (landing), `/sign-in`, `/sign-up`, `/app` (dashboard), `/app/contacts`, `/app/contacts/:id`, `/app/chat`, `/app/agent`, `/app/hub`, `/app/notifications`.
-- Backend: see `lib/api-spec/openapi.yaml`. All routes are mounted in `artifacts/api-server/src/routes/index.ts`.
+- Frontend: `/` (landing), `/sign-in`, `/sign-up`, `/app` (dashboard), `/app/contacts`, `/app/contacts/:id`, `/app/followups`, `/app/chat`, `/app/agent`, `/app/hub`, `/app/notifications`, `/app/profile`.
+- Backend: see `lib/api-spec/openapi.yaml`. All routes are mounted in `artifacts/api-server/src/routes/index.ts`. Note: follow-ups, calendar, priority, star, suggest-tags, and friends endpoints are not in the OpenAPI spec yet — the web app calls them via `customFetch` directly.
 
 ## Important Conventions
 

@@ -14,6 +14,9 @@ import telegramRouter from "./telegram";
 import devSeedRouter from "./dev-seed";
 import storageRouter from "./storage";
 import friendsRouter from "./friends";
+import followupsRouter from "./followups";
+import priorityRouter from "./priority";
+import calendarRouter from "./calendar";
 
 const router: IRouter = Router();
 
@@ -32,5 +35,8 @@ router.use(telegramRouter);
 router.use(devSeedRouter);
 router.use(storageRouter);
 router.use(friendsRouter);
+router.use(followupsRouter);
+router.use(priorityRouter);
+router.use(calendarRouter);
 
 export default router;

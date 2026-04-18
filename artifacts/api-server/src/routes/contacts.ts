@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { db, contactsTable, interactionsTable, notificationsTable } from "@workspace/db";
+import { db, contactsTable, interactionsTable, notificationsTable, followUpsTable } from "@workspace/db";
 import { and, eq, desc, ilike, or, sql } from "drizzle-orm";
+import { suggestTags } from "../lib/aiTags";
 
 const router: IRouter = Router();
 
@@ -55,7 +56,50 @@ router.post("/contacts", requireAuth, async (req, res) => {
       tags: Array.isArray(tags) ? tags : [],
     })
     .returning();
+
+  // If the user didn't provide tags, ask the LLM to suggest some in the
+  // background and store them. Failures are silently ignored.
+  if (!Array.isArray(tags) || tags.length === 0) {
+    suggestTags({ name: created.name, project: created.project, company: created.company, context: created.context })
+      .then((suggested) => {
+        if (suggested.length) {
+          // Only set if the user hasn't tagged it themselves in the meantime —
+          // avoids clobbering a quick post-create edit.
+          return db
+            .update(contactsTable)
+            .set({ tags: suggested })
+            .where(
+              and(
+                eq(contactsTable.id, created.id),
+                sql`COALESCE(array_length(${contactsTable.tags}, 1), 0) = 0`,
+              ),
+            );
+        }
+      })
+      .catch(() => {});
+  }
   res.status(201).json(created);
+});
+
+// On-demand tag suggestion (used by the contact edit UI).
+router.post("/contacts/:id/suggest-tags", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const [c] = await db
+    .select()
+    .from(contactsTable)
+    .where(and(eq(contactsTable.id, id), eq(contactsTable.userId, req.userId!)))
+    .limit(1);
+  if (!c) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const tags = await suggestTags({
+    name: c.name,
+    project: c.project,
+    company: c.company,
+    context: c.context,
+  });
+  res.json({ tags });
 });
 
 router.get("/contacts/:id", requireAuth, async (req, res) => {

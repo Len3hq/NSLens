@@ -214,8 +214,25 @@ router.post("/telegram/webhook", async (req, res) => {
     if (text === "/help") {
       await sendTelegramMessage(
         chatId,
-        "Send any message and I'll route it:\n• Notes about people → saved to contacts\n• Questions about your network → answered from memory\n• Start with 'post:' → shared to the Founders Hub\n• Send a photo, video, file, or link (with optional caption) → posted to the Founders Hub\n\nCommands:\n/post <text> – force a Hub post\n/reminders – check stale contacts now\n/unlink – disconnect this chat",
+        "Send any message and I'll route it:\n• Notes about people → saved to contacts\n• Questions about your network → answered from memory\n• Start with 'post:' → shared to the Founders Hub\n• Send a photo, video, file, or link (with optional caption) → posted to the Founders Hub\n\nCommands:\n/post <text> – force a Hub post\n/followups – list open follow-ups\n/priority – top contacts to focus on\n/tag <name> – list contacts with that tag\n/reminders – check stale contacts now\n/unlink – disconnect this chat",
       );
+      return;
+    }
+
+    if (text === "/followups") {
+      const out = await runAgent(user.id, "show my follow-ups");
+      await sendTelegramMessage(chatId, out.reply);
+      return;
+    }
+    if (text === "/priority") {
+      const out = await runAgent(user.id, "who matters most in my network");
+      await sendTelegramMessage(chatId, out.reply);
+      return;
+    }
+    const tagMatch = text.match(/^\/tag\s+(\S.*)$/i);
+    if (tagMatch) {
+      const out = await runAgent(user.id, `show me my ${tagMatch[1].trim()} contacts`);
+      await sendTelegramMessage(chatId, out.reply);
       return;
     }
 

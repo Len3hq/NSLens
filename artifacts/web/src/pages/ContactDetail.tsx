@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import {
   useGetContact,
   useAddInteraction,
@@ -8,13 +8,14 @@ import {
   useUpdateContact,
   getGetContactQueryKey,
   getListContactsQueryKey,
+  customFetch,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Trash2, Save } from "lucide-react";
+import { ArrowLeft, Trash2, Save, Star, CalendarPlus, Sparkles, Check } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ContactDetail() {
@@ -64,8 +65,15 @@ export default function ContactDetail() {
       </Link>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">{c.name}</CardTitle>
+        <CardHeader className="flex flex-row items-start justify-between gap-2">
+          <CardTitle className="text-2xl flex items-center gap-2">
+            {c.starred && <Star className="w-5 h-5 fill-amber-400 text-amber-400" />}
+            {c.name}
+          </CardTitle>
+          <div className="flex gap-2 flex-wrap">
+            <StarButton id={id} starred={!!c.starred} />
+            <SuggestTagsButton id={id} currentTags={c.tags ?? []} />
+          </div>
         </CardHeader>
         <CardContent>
           <EditForm
@@ -75,6 +83,8 @@ export default function ContactDetail() {
           />
         </CardContent>
       </Card>
+
+      <FollowUpsCard contactId={id} contactName={c.name} />
 
       <Card>
         <CardHeader><CardTitle>Add note</CardTitle></CardHeader>
@@ -201,5 +211,199 @@ function EditForm({
         <Save className="w-4 h-4 mr-2" /> Save
       </Button>
     </div>
+  );
+}
+
+function StarButton({ id, starred }: { id: number; starred: boolean }) {
+  const qc = useQueryClient();
+  const m = useMutation({
+    mutationFn: (next: boolean) =>
+      customFetch(`/api/contacts/${id}/star`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ starred: next }),
+        responseType: "json",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: getGetContactQueryKey(id) });
+      qc.invalidateQueries({ queryKey: getListContactsQueryKey() });
+    },
+  });
+  return (
+    <Button
+      size="sm"
+      variant={starred ? "default" : "outline"}
+      onClick={() => m.mutate(!starred)}
+      disabled={m.isPending}
+    >
+      <Star className={`w-4 h-4 mr-1 ${starred ? "fill-current" : ""}`} />
+      {starred ? "Starred" : "Star"}
+    </Button>
+  );
+}
+
+function SuggestTagsButton({ id, currentTags }: { id: number; currentTags: string[] }) {
+  const qc = useQueryClient();
+  const m = useMutation({
+    mutationFn: () =>
+      customFetch<{ tags: string[] }>(`/api/contacts/${id}/suggest-tags`, {
+        method: "POST",
+        responseType: "json",
+      }),
+    onSuccess: async (res) => {
+      if (!res.tags?.length) {
+        toast("No tag suggestions");
+        return;
+      }
+      const merged = Array.from(new Set([...currentTags, ...res.tags]));
+      await customFetch(`/api/contacts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tags: merged }),
+        responseType: "json",
+      });
+      toast.success(`Added: ${res.tags.join(", ")}`);
+      qc.invalidateQueries({ queryKey: getGetContactQueryKey(id) });
+      qc.invalidateQueries({ queryKey: getListContactsQueryKey() });
+    },
+  });
+  return (
+    <Button size="sm" variant="outline" onClick={() => m.mutate()} disabled={m.isPending}>
+      <Sparkles className="w-4 h-4 mr-1" />
+      {m.isPending ? "Thinking…" : "Suggest tags"}
+    </Button>
+  );
+}
+
+type ContactFollowUp = {
+  id: number;
+  dueAt: string;
+  note: string | null;
+  completedAt: string | null;
+  source: string;
+};
+
+function FollowUpsCard({ contactId, contactName }: { contactId: number; contactName: string }) {
+  const qc = useQueryClient();
+  const [when, setWhen] = useState(() => {
+    const d = new Date(Date.now() + 7 * 86400000);
+    d.setHours(9, 0, 0, 0);
+    return d.toISOString().slice(0, 16); // for input[type=datetime-local]
+  });
+  const [note, setNote] = useState("");
+
+  const { data: rows = [] } = useQuery<ContactFollowUp[]>({
+    queryKey: ["contact-followups", contactId],
+    queryFn: () =>
+      customFetch<ContactFollowUp[]>(`/api/contacts/${contactId}/followups`, {
+        responseType: "json",
+      }),
+  });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["contact-followups", contactId] });
+    qc.invalidateQueries({ queryKey: ["followups"] });
+  };
+
+  const create = useMutation({
+    mutationFn: () =>
+      customFetch(`/api/followups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contactId,
+          dueAt: new Date(when).toISOString(),
+          note: note || null,
+        }),
+        responseType: "json",
+      }),
+    onSuccess: () => {
+      toast.success(`Follow-up scheduled with ${contactName}`);
+      setNote("");
+      refresh();
+    },
+  });
+  const complete = useMutation({
+    mutationFn: (id: number) =>
+      customFetch(`/api/followups/${id}/complete`, { method: "POST", responseType: "json" }),
+    onSuccess: () => refresh(),
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) =>
+      customFetch(`/api/followups/${id}`, { method: "DELETE", responseType: "auto" }),
+    onSuccess: () => refresh(),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CalendarPlus className="w-5 h-5" /> Follow-ups
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[200px] space-y-1">
+            <label className="text-xs text-muted-foreground">When</label>
+            <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+          </div>
+          <div className="flex-[2] min-w-[200px] space-y-1">
+            <label className="text-xs text-muted-foreground">Note (optional)</label>
+            <Input
+              placeholder="e.g. send the deck"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+          <Button onClick={() => create.mutate()} disabled={create.isPending}>
+            <CalendarPlus className="w-4 h-4 mr-1" /> Schedule
+          </Button>
+        </div>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No follow-ups yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {rows.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+              >
+                <div className={r.completedAt ? "line-through opacity-60" : ""}>
+                  <div className="font-medium">
+                    {new Date(r.dueAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                  {r.note && <div className="text-muted-foreground">{r.note}</div>}
+                </div>
+                <div className="flex gap-1">
+                  {!r.completedAt && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => complete.mutate(r.id)}
+                      disabled={complete.isPending}
+                    >
+                      <Check className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => remove.mutate(r.id)}
+                    disabled={remove.isPending}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

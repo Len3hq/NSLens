@@ -15,6 +15,7 @@ export interface Contact {
   context?: string | null;
   /** @nullable */
   company?: string | null;
+  starred?: boolean;
   tags: string[];
   /** @nullable */
   lastInteractionAt?: Date | null;

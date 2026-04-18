@@ -388,6 +388,7 @@ components:
         project: { type: ["string", "null"] }
         context: { type: ["string", "null"] }
         company: { type: ["string", "null"] }
+        starred: { type: boolean }
         tags:
           type: array
           items: { type: string }

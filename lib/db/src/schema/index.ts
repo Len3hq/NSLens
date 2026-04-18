@@ -4,3 +4,4 @@ export * from "./interactions";
 export * from "./notifications";
 export * from "./posts";
 export * from "./friendships";
+export * from "./followups";

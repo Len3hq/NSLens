@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { db, contactsTable, notificationsTable, usersTable } from "@workspace/db";
-import { and, eq, isNull, or, lt } from "drizzle-orm";
+import { db, contactsTable, notificationsTable, usersTable, followUpsTable } from "@workspace/db";
+import { and, eq, isNull, or, lt, lte } from "drizzle-orm";
 import { sendTelegramMessage } from "../lib/telegram";
 
 const router: IRouter = Router();
@@ -59,7 +59,56 @@ export async function evaluateReminders(userId: string) {
       ).catch(() => {});
     }
   }
-  return { evaluated: stale.length, flagged, notifications: created };
+  // Also surface any due follow-ups as notifications.
+  const dueFollowUps = await db
+    .select({
+      id: followUpsTable.id,
+      contactId: followUpsTable.contactId,
+      dueAt: followUpsTable.dueAt,
+      note: followUpsTable.note,
+      contactName: contactsTable.name,
+    })
+    .from(followUpsTable)
+    .leftJoin(contactsTable, eq(contactsTable.id, followUpsTable.contactId))
+    .where(
+      and(
+        eq(followUpsTable.userId, userId),
+        isNull(followUpsTable.completedAt),
+        lte(followUpsTable.dueAt, new Date()),
+      ),
+    );
+  for (const f of dueFollowUps) {
+    // Dedupe per follow-up (not per contact) so multiple due follow-ups for the
+    // same contact each get a notification.
+    const dedupeType = `followup_due:${f.id}`;
+    const [existing] = await db
+      .select()
+      .from(notificationsTable)
+      .where(
+        and(eq(notificationsTable.userId, userId), eq(notificationsTable.type, dedupeType)),
+      )
+      .limit(1);
+    if (existing) continue;
+    const title = `Follow up with ${f.contactName ?? "contact"}`;
+    const body = `Due ${f.dueAt.toISOString().slice(0, 10)}${f.note ? ` — ${f.note}` : ""}`;
+    const [n] = await db
+      .insert(notificationsTable)
+      .values({
+        userId,
+        type: dedupeType,
+        title,
+        body,
+        contactId: f.contactId,
+      })
+      .returning();
+    created.push(n);
+    flagged++;
+    if (user?.telegramChatId) {
+      sendTelegramMessage(user.telegramChatId, `📅 ${title}\n${body}`).catch(() => {});
+    }
+  }
+
+  return { evaluated: stale.length + dueFollowUps.length, flagged, notifications: created };
 }
 
 router.post("/reminders/run", requireAuth, async (req, res) => {
