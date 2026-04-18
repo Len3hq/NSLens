@@ -13,6 +13,7 @@ import {
   Megaphone,
   Bell,
   LogOut,
+  UserCircle,
 } from "lucide-react";
 
 const NAV = [
@@ -22,6 +23,7 @@ const NAV = [
   { to: "/app/agent", label: "Agent", icon: Sparkles },
   { to: "/app/hub", label: "Founders Hub", icon: Megaphone },
   { to: "/app/notifications", label: "Notifications", icon: Bell },
+  { to: "/app/profile", label: "Profile & Friends", icon: UserCircle },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {

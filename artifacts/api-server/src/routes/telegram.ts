@@ -12,6 +12,7 @@ import {
 import { runAgent } from "./agent";
 import { evaluateReminders } from "./reminders";
 import { createHubPost } from "./hub";
+import { handleTelegramQueueReply } from "../lib/telegramQueue";
 import { ObjectStorageService } from "../lib/objectStorage";
 import type { PostAttachment } from "@workspace/db";
 
@@ -205,6 +206,10 @@ router.post("/telegram/webhook", async (req, res) => {
       );
       return;
     }
+
+    // Catch yes/no replies to the "you have N more updates" prompt before
+    // anything else, so users can flush or stop the queue conversationally.
+    if (text && (await handleTelegramQueueReply(user.id, text))) return;
 
     if (text === "/help") {
       await sendTelegramMessage(

@@ -13,6 +13,7 @@ import dashboardRouter from "./dashboard";
 import telegramRouter from "./telegram";
 import devSeedRouter from "./dev-seed";
 import storageRouter from "./storage";
+import friendsRouter from "./friends";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(dashboardRouter);
 router.use(telegramRouter);
 router.use(devSeedRouter);
 router.use(storageRouter);
+router.use(friendsRouter);
 
 export default router;

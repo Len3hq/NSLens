@@ -10,7 +10,7 @@ import {
 } from "@workspace/db";
 import { desc, eq, ne } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
-import { sendTelegramMessage } from "../lib/telegram";
+import { enqueueTelegram } from "../lib/telegramQueue";
 import { embedText, similarContacts } from "../lib/embeddings";
 
 const router: IRouter = Router();
@@ -227,11 +227,6 @@ export function buildSearchableText(
 const RELEVANCE_PROMPT = `You decide whether a public post from one founder is relevant to specific contacts in another founder's network. Consider both the post content and any image/link descriptions.
 Reply with strict JSON: { "relevant": true|false, "reason": "...", "matchedNames": ["Name", ...] }. Only true if the post clearly aligns with one or more contacts (similar project, complementary need, shared topic). Keep "reason" to one sentence written directly to the recipient (the network owner), e.g. "Sara at Anthropic is building agents — this RAG demo could be useful to her."`;
 
-// Cap how many recipients get a Telegram DM for a single fan-out so people
-// with broadly-relevant networks don't get spammed. Everyone still gets the
-// in-app notification; only the top N by relevance score get a push.
-const MAX_TELEGRAM_FANOUT = 3;
-
 function publicAppUrl(path: string): string {
   const base =
     process.env.PUBLIC_APP_URL ||
@@ -262,8 +257,8 @@ export async function fanOutPost(post: {
   // so a single fan-out can never blast more than MAX_TELEGRAM_FANOUT DMs.
   type Match = {
     user: (typeof others)[number];
-    title: string;
-    body: string;
+    notificationId: number;
+    reason: string;
     score: number;
   };
   const matches: Match[] = [];
@@ -313,38 +308,39 @@ export async function fanOutPost(post: {
       const body = `${reason || "This might be relevant to people you know."}\nMatched contacts: ${matched.join(", ")}`;
 
       // Always create the in-app notification — that's not noisy.
-      await db.insert(notificationsTable).values({
-        userId: u.id,
-        type: "hub_match",
-        title,
-        body,
-        postId: post.id,
-      });
+      const [notif] = await db
+        .insert(notificationsTable)
+        .values({
+          userId: u.id,
+          type: "hub_match",
+          title,
+          body,
+          postId: post.id,
+        })
+        .returning();
 
       matches.push({
         user: u,
-        title,
-        body,
+        notificationId: notif.id,
+        reason: reason || `${post.authorName} posted something that matches your network.`,
         score: filtered[0]?.similarity ?? 0,
       });
     }),
   );
 
-  // Send Telegram DMs only to the top N most-relevant linked recipients.
-  // The /hub/p/:id route is public — no login required to read the post.
+  // Queue a SHORT Telegram message for every linked recipient — the queue
+  // itself enforces the 3-at-a-time cap and the "want more?" follow-up.
+  // The /hub/p/:id route is public so recipients can read without logging in.
   const postUrl = publicAppUrl(`/hub/p/${post.id}`);
-  const telegramRecipients = matches
-    .filter((m) => m.user.telegramChatId)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_TELEGRAM_FANOUT);
-
   await Promise.all(
-    telegramRecipients.map((m) =>
-      sendTelegramMessage(
-        m.user.telegramChatId!,
-        `🤝 ${m.title}\n${m.body}\n\nRead the post: ${postUrl}`,
-      ).catch(() => {}),
-    ),
+    matches
+      .filter((m) => m.user.telegramChatId)
+      .sort((a, b) => b.score - a.score)
+      .map((m) => {
+        const oneLine = m.reason.replace(/\s+/g, " ").trim().slice(0, 140);
+        const text = `🤝 ${oneLine}\n${postUrl}`;
+        return enqueueTelegram(m.user.id, m.notificationId, text).catch(() => {});
+      }),
   );
 }
 
