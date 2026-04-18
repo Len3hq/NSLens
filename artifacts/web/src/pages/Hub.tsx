@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListPosts, useCreatePost, getListPostsQueryKey } from "@workspace/api-client-react";
+import { useListPosts, useCreatePost, getListPostsQueryKey, customFetch } from "@workspace/api-client-react";
 import type { PostAttachment, Post } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,16 @@ type DraftAttachment = PostAttachment & { previewUrl?: string };
 const objectUrl = (objectPath: string) => `/api/storage${objectPath}`;
 
 async function uploadFile(file: File): Promise<{ objectPath: string }> {
-  const r = await fetch("/api/storage/uploads/request-url", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-  });
-  if (!r.ok) throw new Error("could not request upload URL");
-  const { uploadURL, objectPath } = await r.json();
+  // customFetch attaches the Clerk bearer token registered in App.tsx.
+  const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
+    "/api/storage/uploads/request-url",
+    {
+      method: "POST",
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      responseType: "json",
+    },
+  );
+  // The presigned upload URL is for a public object-store endpoint; no auth header.
   const put = await fetch(uploadURL, {
     method: "PUT",
     headers: { "Content-Type": file.type || "application/octet-stream" },

@@ -9,7 +9,7 @@ Personal CRM web app: capture every person you meet, ask your network anything, 
 - **API**: Express at `artifacts/api-server` (port 8080). Mounts `clerkMiddleware()`, all `/api/*` routes require auth.
 - **DB**: Drizzle + Postgres (`@workspace/db`). Schemas in `lib/db/src/schema/{users,contacts,interactions,notifications,posts}.ts`. Run `pnpm --filter @workspace/db push` after schema changes.
 - **API contract**: OpenAPI 3.1 in `lib/api-spec/openapi.yaml`. Codegen with `pnpm --filter @workspace/api-spec run codegen` produces TanStack Query hooks (`@workspace/api-client-react`) and zod schemas (`@workspace/api-zod`). The `api-zod` barrel only re-exports `generated/api` to avoid duplicate-export collisions.
-- **Auth**: Clerk (managed). Web uses `@clerk/react` with `<ClerkProvider>` + branded `appearance`/`localization`. Server uses `@clerk/express`. Custom `requireAuth` middleware in `artifacts/api-server/src/lib/auth.ts` upserts the user record on first contact.
+- **Auth**: Clerk (managed). Web uses `@clerk/react` with `<ClerkProvider>` + branded `appearance`/`localization`. Server uses `@clerk/express`. Custom `requireAuth` middleware in `artifacts/api-server/src/lib/auth.ts` upserts the user record on first contact. The web app must call `setAuthTokenGetter()` from `@workspace/api-client-react` with Clerk's `getToken()` so every API request carries `Authorization: Bearer <token>` — without this, all `/api/*` calls return 401. This is wired in `App.tsx > ClerkAuthBridge`.
 - **LLM**: Replit OpenAI integration (model `gpt-5.2`) via `artifacts/api-server/src/lib/openai.ts`. Used for entity extraction (text + image), memory chat answers, agent intent routing, and Hub relevance scoring.
 
 ## Phases (all implemented)

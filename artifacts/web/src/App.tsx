@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, Show, useClerk } from "@clerk/react";
+import { ClerkProvider, Show, useClerk, useAuth } from "@clerk/react";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
 import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
@@ -111,6 +112,24 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+// Bridges Clerk's session token into the generated API client so every
+// request gets `Authorization: Bearer <token>` and the server can identify
+// the user. Without this, every protected API call returns 401.
+function ClerkAuthBridge() {
+  const { getToken, isSignedIn } = useAuth();
+  useEffect(() => {
+    setAuthTokenGetter(async () => {
+      if (!isSignedIn) return null;
+      try {
+        return (await getToken()) ?? null;
+      } catch {
+        return null;
+      }
+    });
+  }, [getToken, isSignedIn]);
+  return null;
+}
+
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
   return (
@@ -127,6 +146,7 @@ function ClerkProviderWithRoutes() {
     >
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
+          <ClerkAuthBridge />
           <ClerkQueryClientCacheInvalidator />
           <Switch>
             <Route path="/" component={HomeRedirect} />
