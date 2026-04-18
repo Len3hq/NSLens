@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Megaphone, Image as ImageIcon, Film, Link as LinkIcon, Paperclip } from "lucide-react";
+import { relativeTime, fullDateTime } from "@/lib/relativeTime";
 
 type Attachment = {
   type: "image" | "video" | "link" | "file";
@@ -132,8 +133,8 @@ export default function PublicPost() {
                   <div className="font-medium truncate">
                     {post.authorUsername ? `@${post.authorUsername}` : post.authorName}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(post.createdAt).toLocaleString()}
+                  <div className="text-xs text-muted-foreground" title={fullDateTime(post.createdAt)}>
+                    {relativeTime(post.createdAt)}
                   </div>
                 </div>
               </div>

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Megaphone, Send, Image as ImageIcon, Film, Link as LinkIcon, X, Paperclip } from "lucide-react";
 import { toast } from "sonner";
+import { relativeTime, fullDateTime } from "@/lib/relativeTime";
 
 type DraftAttachment = PostAttachment & { previewUrl?: string };
 
@@ -21,14 +22,6 @@ function authorHandle(p: { authorUsername?: string | null; authorName?: string |
 function authorInitial(p: { authorUsername?: string | null; authorName?: string | null }) {
   const src = p.authorUsername || p.authorName || "?";
   return src.replace(/^@/, "").charAt(0).toUpperCase();
-}
-function relativeTime(iso: string) {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString();
 }
 
 async function uploadFile(file: File): Promise<{ objectPath: string }> {
@@ -289,7 +282,9 @@ export default function Hub() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="font-medium text-[14px] truncate">{handle}</div>
-                        <div className="text-[11px] text-muted-foreground">{relativeTime(p.createdAt)}</div>
+                        <div className="text-[11px] text-muted-foreground" title={fullDateTime(p.createdAt)}>
+                          {relativeTime(p.createdAt)}
+                        </div>
                       </div>
                     </div>
 
