@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, notificationsTable } from "@workspace/db";
 import { and, eq, gt } from "drizzle-orm";
 import {
   downloadFromUrl,
@@ -17,6 +17,33 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import type { PostAttachment } from "@workspace/db";
 
 const router: IRouter = Router();
+
+// Single source of truth for tearing down a user's Telegram link. Used by:
+//  - HTTP unlink (`POST /me/telegram/unlink`)
+//  - `/unlink` command inside the bot
+//  - account deletion (`DELETE /me`)
+// Clears every per-user telegram field AND drops any pending queued
+// notifications so we don't try to send to a stale chat id later.
+export async function disconnectUserTelegram(userId: string): Promise<void> {
+  await db
+    .update(usersTable)
+    .set({
+      telegramChatId: null,
+      telegramLinkCode: null,
+      telegramLinkCodeExpiresAt: null,
+      telegramAwaitingMore: false,
+    })
+    .where(eq(usersTable.id, userId));
+  await db
+    .update(notificationsTable)
+    .set({ telegramQueued: false })
+    .where(
+      and(
+        eq(notificationsTable.userId, userId),
+        eq(notificationsTable.telegramQueued, true),
+      ),
+    );
+}
 
 // Pull out photos / videos / documents / animations from a Telegram message,
 // download them, push them into our object storage, and return PostAttachment[].
@@ -122,10 +149,7 @@ router.post("/me/telegram/link", requireAuth, async (req, res) => {
 });
 
 router.post("/me/telegram/unlink", requireAuth, async (req, res) => {
-  await db
-    .update(usersTable)
-    .set({ telegramChatId: null, telegramLinkCode: null, telegramLinkCodeExpiresAt: null })
-    .where(eq(usersTable.id, req.userId!));
+  await disconnectUserTelegram(req.userId!);
   res.json({ ok: true });
 });
 
@@ -290,13 +314,10 @@ router.post("/telegram/webhook", async (req, res) => {
     }
 
     if (text === "/unlink") {
-      await db
-        .update(usersTable)
-        .set({ telegramChatId: null })
-        .where(eq(usersTable.id, user.id));
+      await disconnectUserTelegram(user.id);
       await sendTelegramMessage(
         chatId,
-        "Disconnected. Re-link any time from the Network Brain dashboard.",
+        "Disconnected. Re-link any time from the NS Lens dashboard.",
       );
       return;
     }

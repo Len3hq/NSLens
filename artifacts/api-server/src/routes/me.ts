@@ -12,6 +12,8 @@ import {
   followUpsTable,
 } from "@workspace/db";
 import { and, eq, ne, or } from "drizzle-orm";
+import { sendTelegramMessage } from "../lib/telegram";
+import { disconnectUserTelegram } from "./telegram";
 
 const router: IRouter = Router();
 
@@ -98,9 +100,25 @@ router.patch("/me", requireAuth, async (req, res) => {
 router.delete("/me", requireAuth, async (req, res) => {
   const userId = req.userId!;
 
-  // 1. Delete in Clerk. This is the only thing that actually invalidates
+  // 1. Read the chat id up front (we'll need it for the goodbye after Clerk
+  //    delete succeeds — but we must NOT message the user until we know the
+  //    delete actually happened, otherwise we'd lie if Clerk fails).
+  let telegramChatId: string | null = null;
+  try {
+    const [u] = await db
+      .select({ telegramChatId: usersTable.telegramChatId })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+    telegramChatId = u?.telegramChatId ?? null;
+  } catch (err) {
+    req.log?.warn({ err }, "telegram chat id lookup failed (non-fatal)");
+  }
+
+  // 2. Delete in Clerk. This is the only thing that actually invalidates
   //    sessions and blocks future logins — without it the user can keep
-  //    signing in via magic link.
+  //    signing in via magic link. Bail before any local destruction if Clerk
+  //    rejects, so the account stays consistent across systems.
   try {
     await clerkClient.users.deleteUser(userId);
   } catch (err: unknown) {
@@ -113,7 +131,31 @@ router.delete("/me", requireAuth, async (req, res) => {
     // 404/410 means already gone in Clerk — fall through and clean up locally.
   }
 
-  // 2. Cascade local data. Drop everything tied to this user across the app.
+  // 3. Now that the account is truly gone in Clerk, send the goodbye on
+  //    Telegram (best-effort).
+  if (telegramChatId) {
+    try {
+      await sendTelegramMessage(
+        telegramChatId,
+        "Your NS Lens account has been deleted. This chat is now disconnected and all your data has been removed.",
+      );
+    } catch (err) {
+      req.log?.warn({ err }, "telegram goodbye failed (non-fatal)");
+    }
+  }
+
+  // 4. Tear down the Telegram link explicitly (clears chat id, link codes,
+  //    awaiting-more flag, and any queued telegram notifications). This is
+  //    redundant with the user-row delete below, but keeps the contract
+  //    consistent with the HTTP and /unlink command paths and races safely
+  //    with any in-flight queue pump.
+  try {
+    await disconnectUserTelegram(userId);
+  } catch (err) {
+    req.log?.warn({ err }, "telegram disconnect failed (non-fatal)");
+  }
+
+  // 5. Cascade local data. Drop everything tied to this user across the app.
   try {
     await db.delete(notificationsTable).where(eq(notificationsTable.userId, userId));
     await db.delete(interactionsTable).where(eq(interactionsTable.userId, userId));

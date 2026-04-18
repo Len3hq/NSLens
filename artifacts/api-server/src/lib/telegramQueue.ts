@@ -90,8 +90,22 @@ async function pumpInner(userId: string): Promise<{ sent: number; remaining: num
 
   let sent = 0;
   for (const n of claimed) {
+    // Re-check the chat link before every send: an unlink or account delete
+    // may have happened between when we loaded `user` and now. Without this
+    // check we'd keep flushing notifications to a chat the user just
+    // disconnected.
+    const [fresh] = await db
+      .select({ telegramChatId: usersTable.telegramChatId })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+    if (!fresh?.telegramChatId) {
+      // Bail out: stop sending to this (now-disconnected) chat. The remaining
+      // claimed rows are not re-queued because the user no longer wants them.
+      break;
+    }
     const text = n.telegramText ?? `${n.title}\n${n.body}`;
-    const ok = await sendTelegramMessage(user.telegramChatId, text);
+    const ok = await sendTelegramMessage(fresh.telegramChatId, text);
     if (ok) {
       await db
         .update(notificationsTable)
