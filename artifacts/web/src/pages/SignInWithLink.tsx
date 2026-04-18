@@ -20,6 +20,7 @@ export default function SignInWithLink() {
   const [phase, setPhase] = useState<Phase>("enter");
   const [mode, setMode] = useState<Mode>("signIn");
   const [verifying, setVerifying] = useState(false);
+  const verifyingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -84,7 +85,18 @@ export default function SignInWithLink() {
 
     // 2. New user — sign-up
     try {
-      await signUp.create({ emailAddress });
+      const localPart = emailAddress.split("@")[0] ?? "";
+      const friendly =
+        localPart
+          .split(/[._-]+/)
+          .filter(Boolean)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ") || "Member";
+      await signUp.create({
+        emailAddress,
+        firstName: friendly,
+        lastName: " ",
+      });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setMode("signUp");
       setPhase("code");
@@ -95,40 +107,73 @@ export default function SignInWithLink() {
   }
 
   async function verifyCode(otp: string) {
+    if (verifyingRef.current) return;
+    verifyingRef.current = true;
     setVerifying(true);
     const client = clerk.client;
     if (!client) {
       toast.error("Auth not ready, please reload.");
+      verifyingRef.current = false;
       setVerifying(false);
       return;
     }
     try {
       if (mode === "signIn") {
-        const result = await client.signIn.attemptFirstFactor({
-          strategy: "email_code",
-          code: otp,
-        });
-        if (result.status === "complete" && result.createdSessionId) {
-          await clerk.setActive({ session: result.createdSessionId });
-          setLocation("/app");
-        } else {
-          toast.error("Couldn't sign you in. Please try again.");
-          setVerifying(false);
+        let signIn = client.signIn;
+        if (signIn.firstFactorVerification?.status !== "verified") {
+          const result = await signIn.attemptFirstFactor({
+            strategy: "email_code",
+            code: otp,
+          });
+          signIn = result;
         }
+        if (signIn.status === "complete" && signIn.createdSessionId) {
+          await clerk.setActive({ session: signIn.createdSessionId });
+          setLocation("/app");
+          return;
+        }
+        toast.error(`Couldn't sign you in (status: ${signIn.status}).`);
       } else {
-        const result = await client.signUp.attemptEmailAddressVerification({
-          code: otp,
-        });
-        if (result.status === "complete" && result.createdSessionId) {
-          await clerk.setActive({ session: result.createdSessionId });
-          setLocation("/app");
-        } else {
-          toast.error("Couldn't finish sign-up. Please try again.");
-          setVerifying(false);
+        let signUp = client.signUp;
+        if (signUp.verifications?.emailAddress?.status !== "verified") {
+          const result = await signUp.attemptEmailAddressVerification({
+            code: otp,
+          });
+          signUp = result;
         }
+        // If sign-up needs more fields, fill safe defaults and retry.
+        if (
+          signUp.status === "missing_requirements" &&
+          signUp.missingFields?.length
+        ) {
+          const updates: Record<string, string> = {};
+          for (const f of signUp.missingFields) {
+            if (f === "first_name") updates.firstName = "Member";
+            else if (f === "last_name") updates.lastName = " ";
+            else if (f === "username")
+              updates.username = `user_${Math.random().toString(36).slice(2, 9)}`;
+          }
+          if (Object.keys(updates).length) {
+            signUp = await signUp.update(updates);
+          }
+        }
+        if (signUp.status === "complete" && signUp.createdSessionId) {
+          await clerk.setActive({ session: signUp.createdSessionId });
+          setLocation("/app");
+          return;
+        }
+        toast.error(
+          `Couldn't finish sign-up (status: ${signUp.status}${
+            signUp.missingFields?.length
+              ? `, missing: ${signUp.missingFields.join(", ")}`
+              : ""
+          }).`,
+        );
       }
     } catch (err: any) {
       toast.error(errMsg(err, "Invalid or expired code."));
+    } finally {
+      verifyingRef.current = false;
       setVerifying(false);
     }
   }
