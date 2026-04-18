@@ -7,7 +7,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Megaphone, Send, Image as ImageIcon, Film, Link as LinkIcon, X, Paperclip } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Megaphone, Send, Image as ImageIcon, Film, Link as LinkIcon, X, Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { relativeTime, fullDateTime } from "@/lib/relativeTime";
 
@@ -110,6 +118,7 @@ function AttachmentPreviewStrip({ attachments }: { attachments: PostAttachment[]
 
 export default function Hub() {
   const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
   const [linkInput, setLinkInput] = useState("");
   const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
@@ -126,6 +135,7 @@ export default function Hub() {
         setContent("");
         setLinkInput("");
         setAttachments([]);
+        setOpen(false);
         qc.invalidateQueries({ queryKey: getListPostsQueryKey() });
       },
       onError: () => toast.error("Could not post"),
@@ -171,94 +181,121 @@ export default function Hub() {
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Megaphone className="w-6 h-6" /> Founders Hub
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Share text, photos, video, files, and links. The system reads your post (including
-          images and link previews) and notifies other founders when it matches someone in their
-          network.
-        </p>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Megaphone className="w-6 h-6" /> Founders Hub
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Share text, photos, video, files, and links. We read your post and notify other
+            founders when it matches someone in their network.
+          </p>
+        </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button className="rounded-full shrink-0 hidden sm:inline-flex">
+              <Plus className="w-4 h-4 mr-1.5" /> New post
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Megaphone className="w-5 h-5" /> Share with the Hub
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Textarea
+                rows={5}
+                placeholder="What are you building? What do you need?"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                autoFocus
+              />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  hidden
+                  multiple
+                  accept="image/*,video/*,application/pdf"
+                  onChange={onPickFiles}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  <ImageIcon className="w-4 h-4 mr-1" /> Photo / video / file
+                </Button>
+                <div className="flex items-center gap-1 flex-1 min-w-[180px]">
+                  <Input
+                    placeholder="Paste a link…"
+                    value={linkInput}
+                    onChange={(e) => setLinkInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addLink();
+                      }
+                    }}
+                  />
+                  <Button type="button" size="sm" variant="outline" onClick={addLink}>
+                    <LinkIcon className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((a, i) => (
+                    <AttachmentChip
+                      key={i}
+                      a={a}
+                      onRemove={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter className="sm:justify-between sm:items-center gap-2">
+              <span className="text-xs text-muted-foreground order-last sm:order-first">
+                {isUploading ? "Uploading…" : "Posts are public to your network."}
+              </span>
+              <Button
+                onClick={() =>
+                  create.mutate({
+                    data: {
+                      content,
+                      attachments: attachments.map(({ previewUrl: _p, ...rest }) => rest),
+                    },
+                  })
+                }
+                disabled={!canPost}
+              >
+                <Send className="w-4 h-4 mr-2" /> Post
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <Textarea
-            rows={3}
-            placeholder="What are you building? What do you need?"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              hidden
-              multiple
-              accept="image/*,video/*,application/pdf"
-              onChange={onPickFiles}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-            >
-              <ImageIcon className="w-4 h-4 mr-1" /> Photo / video / file
-            </Button>
-            <div className="flex items-center gap-1 flex-1 min-w-[200px]">
-              <Input
-                placeholder="Paste a link…"
-                value={linkInput}
-                onChange={(e) => setLinkInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addLink();
-                  }
-                }}
-              />
-              <Button type="button" size="sm" variant="outline" onClick={addLink}>
-                <LinkIcon className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {attachments.map((a, i) => (
-                <AttachmentChip
-                  key={i}
-                  a={a}
-                  onRemove={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
-                />
-              ))}
-            </div>
-          )}
-
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">
-              {isUploading ? "Uploading…" : ""}
-            </span>
-            <Button
-              onClick={() =>
-                create.mutate({
-                  data: {
-                    content,
-                    attachments: attachments.map(({ previewUrl: _p, ...rest }) => rest),
-                  },
-                })
-              }
-              disabled={!canPost}
-            >
-              <Send className="w-4 h-4 mr-2" /> Post
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Lightweight composer-trigger card on mobile, also acts as an empty-feed CTA */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full text-left rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-card/80 transition-colors p-3 flex items-center gap-3"
+      >
+        <div className="w-9 h-9 rounded-full bg-secondary grid place-items-center text-muted-foreground shrink-0">
+          <Plus className="w-4 h-4" />
+        </div>
+        <span className="text-sm text-muted-foreground flex-1 truncate">
+          What are you building? What do you need?
+        </span>
+        <span className="hidden sm:inline-flex text-xs text-primary font-medium">Post</span>
+      </button>
 
       <div className="space-y-3">
         {posts.length === 0 ? (
