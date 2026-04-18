@@ -5,11 +5,13 @@
  * Network Brain API
  * OpenAPI spec version: 0.1.0
  */
+import type { PostAttachment } from "./postAttachment";
 
 export interface Post {
   id: number;
   authorId: string;
   authorName: string;
   content: string;
+  attachments: PostAttachment[];
   createdAt: Date;
 }

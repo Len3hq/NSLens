@@ -12,6 +12,7 @@ import hubRouter from "./hub";
 import dashboardRouter from "./dashboard";
 import telegramRouter from "./telegram";
 import devSeedRouter from "./dev-seed";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(hubRouter);
 router.use(dashboardRouter);
 router.use(telegramRouter);
 router.use(devSeedRouter);
+router.use(storageRouter);
 
 export default router;

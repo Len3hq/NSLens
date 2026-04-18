@@ -552,6 +552,20 @@ components:
             $ref: "#/components/schemas/Notification"
       required: [evaluated, flagged, notifications]
 
+    PostAttachment:
+      type: object
+      properties:
+        type: { type: string, enum: [image, video, link, file] }
+        objectPath: { type: ["string", "null"] }
+        url: { type: ["string", "null"] }
+        mimeType: { type: ["string", "null"] }
+        caption: { type: ["string", "null"] }
+        ogTitle: { type: ["string", "null"] }
+        ogDescription: { type: ["string", "null"] }
+        ogImage: { type: ["string", "null"] }
+        aiDescription: { type: ["string", "null"] }
+      required: [type]
+
     Post:
       type: object
       properties:
@@ -559,14 +573,34 @@ components:
         authorId: { type: string }
         authorName: { type: string }
         content: { type: string }
+        attachments:
+          type: array
+          items: { $ref: "#/components/schemas/PostAttachment" }
         createdAt: { type: string, format: date-time }
-      required: [id, authorId, authorName, content, createdAt]
+      required: [id, authorId, authorName, content, attachments, createdAt]
 
     CreatePostInput:
       type: object
       properties:
         content: { type: string }
+        attachments:
+          type: array
+          items: { $ref: "#/components/schemas/PostAttachment" }
       required: [content]
+
+    RequestUploadUrlInput:
+      type: object
+      properties:
+        name: { type: ["string", "null"] }
+        size: { type: ["integer", "null"] }
+        contentType: { type: ["string", "null"] }
+
+    RequestUploadUrlResponse:
+      type: object
+      properties:
+        uploadURL: { type: string }
+        objectPath: { type: string }
+      required: [uploadURL, objectPath]
 
     TelegramStatus:
       type: object

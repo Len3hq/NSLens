@@ -3,14 +3,81 @@ import { requireAuth } from "../lib/auth";
 import { db, usersTable } from "@workspace/db";
 import { and, eq, gt } from "drizzle-orm";
 import {
+  downloadFromUrl,
   getTelegramBotInfo,
+  getTelegramFileUrl,
   getWebhookSecret,
   sendTelegramMessage,
 } from "../lib/telegram";
 import { runAgent } from "./agent";
 import { evaluateReminders } from "./reminders";
+import { createHubPost } from "./hub";
+import { ObjectStorageService } from "../lib/objectStorage";
+import type { PostAttachment } from "@workspace/db";
 
 const router: IRouter = Router();
+
+// Pull out photos / videos / documents / animations from a Telegram message,
+// download them, push them into our object storage, and return PostAttachment[].
+async function collectTelegramAttachments(message: {
+  photo?: { file_id: string; file_size?: number; width?: number; height?: number }[];
+  video?: { file_id: string; mime_type?: string };
+  animation?: { file_id: string; mime_type?: string };
+  document?: { file_id: string; mime_type?: string; file_name?: string };
+}): Promise<PostAttachment[]> {
+  const storage = new ObjectStorageService();
+  const out: PostAttachment[] = [];
+
+  // Helper: download a Telegram file_id and upload it to GCS.
+  async function ingest(
+    fileId: string,
+    fallbackMime: string,
+    type: PostAttachment["type"],
+  ): Promise<PostAttachment | null> {
+    const url = await getTelegramFileUrl(fileId);
+    if (!url) return null;
+    const data = await downloadFromUrl(url);
+    if (!data) return null;
+    const mime = data.contentType !== "application/octet-stream" ? data.contentType : fallbackMime;
+    const objectPath = await storage.uploadBuffer(data.buffer, mime);
+    return { type, objectPath, mimeType: mime };
+  }
+
+  if (message.photo?.length) {
+    // Telegram sends multiple sizes — pick the largest.
+    const best = [...message.photo].sort((a, b) => (b.file_size ?? 0) - (a.file_size ?? 0))[0];
+    const a = await ingest(best.file_id, "image/jpeg", "image");
+    if (a) out.push(a);
+  }
+  if (message.video) {
+    const a = await ingest(
+      message.video.file_id,
+      message.video.mime_type ?? "video/mp4",
+      "video",
+    );
+    if (a) out.push(a);
+  }
+  if (message.animation) {
+    const a = await ingest(
+      message.animation.file_id,
+      message.animation.mime_type ?? "video/mp4",
+      "video",
+    );
+    if (a) out.push(a);
+  }
+  if (message.document) {
+    const mime = message.document.mime_type ?? "application/octet-stream";
+    const isImage = mime.startsWith("image/");
+    const isVideo = mime.startsWith("video/");
+    const a = await ingest(
+      message.document.file_id,
+      mime,
+      isImage ? "image" : isVideo ? "video" : "file",
+    );
+    if (a) out.push(a);
+  }
+  return out;
+}
 
 function genCode(): string {
   // 8-char base32-ish, easy to type on mobile
@@ -76,8 +143,10 @@ router.post("/telegram/webhook", async (req, res) => {
   const message = update.message;
   if (!message?.chat?.id) return;
   const chatId = String(message.chat.id);
-  const text: string = (message.text ?? "").trim();
-  if (!text) return;
+  // Telegram sends `caption` for media (photo/video/document) and `text` for plain messages.
+  const text: string = (message.text ?? message.caption ?? "").trim();
+  const hasMedia = !!(message.photo || message.video || message.document || message.animation);
+  if (!text && !hasMedia) return;
 
   try {
     // /start <code> → link this chat to a Network Brain account
@@ -140,8 +209,52 @@ router.post("/telegram/webhook", async (req, res) => {
     if (text === "/help") {
       await sendTelegramMessage(
         chatId,
-        "Send any message and I'll route it:\n• Notes about people → saved to contacts\n• Questions about your network → answered from memory\n• Start with 'post:' → shared to the Founders Hub\n\nCommands:\n/reminders – check stale contacts now\n/unlink – disconnect this chat",
+        "Send any message and I'll route it:\n• Notes about people → saved to contacts\n• Questions about your network → answered from memory\n• Start with 'post:' → shared to the Founders Hub\n• Send a photo, video, file, or link (with optional caption) → posted to the Founders Hub\n\nCommands:\n/post <text> – force a Hub post\n/reminders – check stale contacts now\n/unlink – disconnect this chat",
       );
+      return;
+    }
+
+    // Media messages, /post, "post:" prefix, or a message that is just a bare URL
+    // (one or more URLs and very little other text) → create a Founders Hub post.
+    const isExplicitPostCommand = /^\/post(\s|$)/i.test(text);
+    const looksLikePost = /^\s*post\s*:/i.test(text);
+    const urlsInText = text.match(/https?:\/\/\S+/g) ?? [];
+    const stripped = urlsInText.reduce((acc, u) => acc.replace(u, ""), text).trim();
+    const isBareLinkMessage = urlsInText.length > 0 && stripped.length <= 12;
+    if (
+      hasMedia ||
+      isExplicitPostCommand ||
+      looksLikePost ||
+      isBareLinkMessage
+    ) {
+      const cleanText = text
+        .replace(/^\/post\s*/i, "")
+        .replace(/^\s*post\s*:\s*/i, "")
+        .trim();
+      const attachments = await collectTelegramAttachments(message);
+      // Auto-detect bare URLs in the caption/text and add them as link attachments.
+      const urls = cleanText.match(/https?:\/\/\S+/g) ?? [];
+      for (const url of urls) {
+        if (!attachments.some((a) => a.url === url)) {
+          attachments.push({ type: "link", url });
+        }
+      }
+      try {
+        const created = await createHubPost(user.id, cleanText, attachments);
+        const what = attachments.length
+          ? `${attachments.length} attachment${attachments.length === 1 ? "" : "s"}`
+          : "your post";
+        await sendTelegramMessage(
+          chatId,
+          `📣 Posted to the Founders Hub with ${what}. I'll notify people in your network if it's relevant to them.${created.id ? "" : ""}`,
+        );
+      } catch (err) {
+        req.log?.error({ err }, "telegram hub post failed");
+        await sendTelegramMessage(
+          chatId,
+          "I couldn't post that to the Hub. Try again in a moment.",
+        );
+      }
       return;
     }
 

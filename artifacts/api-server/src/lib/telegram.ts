@@ -68,6 +68,34 @@ export async function getTelegramBotInfo(): Promise<{ username?: string } | null
   return tg<{ username?: string }>("getMe", {});
 }
 
+// Resolve a Telegram file_id to a temporary download URL via getFile.
+export async function getTelegramFileUrl(fileId: string): Promise<string | null> {
+  const token = getTelegramToken();
+  if (!token) return null;
+  const file = await tg<{ file_path?: string }>("getFile", { file_id: fileId });
+  if (!file?.file_path) return null;
+  return `${API_BASE}/file/bot${token}/${file.file_path}`;
+}
+
+// Download bytes from a URL (used for Telegram-hosted media).
+export async function downloadFromUrl(url: string): Promise<{
+  buffer: Buffer;
+  contentType: string;
+} | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const ab = await r.arrayBuffer();
+    return {
+      buffer: Buffer.from(ab),
+      contentType: r.headers.get("content-type") ?? "application/octet-stream",
+    };
+  } catch (err) {
+    logger.warn({ err, url }, "downloadFromUrl failed");
+    return null;
+  }
+}
+
 export function getWebhookSecret(): string {
   // Stable per-process secret derived from the bot token. Telegram echoes this
   // in the X-Telegram-Bot-Api-Secret-Token header to prove the request came

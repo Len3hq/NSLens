@@ -18,7 +18,14 @@ Personal CRM web app: capture every person you meet, ask your network anything, 
 2. **Memory layer** – `/api/chat` performs keyword search across contacts + interactions and grounds the LLM answer with sources.
 3. **Proactive agents** – `/api/reminders/run` flags contacts not interacted with in `reminderDays` (default 21) and creates `stale_contact` notifications. Triggered manually from the dashboard ("Check reminders" button); ready to be scheduled.
 4. **Agent router** – `/api/agent` classifies messages into INGEST | QUERY | POST | UNKNOWN and dispatches to the right backend. Lives at `/app/agent`. (Built in-app instead of Telegram/Discord, since the user wanted a working app first.)
-5. **Founders Hub** – `/api/hub` posts fan out asynchronously: each post is matched against every other user's contacts via keyword overlap and an LLM relevance check, generating personalized `hub_match` notifications.
+5. **Founders Hub (multimedia)** – `/api/hub` posts can include text + multiple attachments (`PostAttachment[]` in `posts.attachments` jsonb): images, videos, files, and links. On create, posts are inserted immediately for snappy UX, then enriched in the background — images are described by GPT vision (`describeImage` over `publicObjectUrl`), links are scraped for og:title/description/image (`fetchLinkPreview`, hardened against SSRF: http(s) only, RFC1918/loopback/link-local blocked, post-redirect re-check). Enriched text is stored in `posts.searchableText` and used to embed the post and run `similarContacts` per recipient (sim floor 0.2), with a final LLM relevance pass that returns matched names → personalized `hub_match` notifications + Telegram pings.
+
+## Object Storage
+
+- GCS via Replit sidecar. `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PRIVATE_OBJECT_DIR`, `PUBLIC_OBJECT_SEARCH_PATHS` are set as secrets.
+- `artifacts/api-server/src/lib/objectStorage.ts` provides `getObjectEntityUploadURL`, `normalizeObjectEntityPath`, `getObjectEntityFile`, `downloadObject`, and a server-side `uploadBuffer(buffer, mime)` helper used by the Telegram webhook.
+- Routes in `artifacts/api-server/src/routes/storage.ts`: `POST /storage/uploads/request-url` (auth-required, returns presigned PUT URL + canonical objectPath), `GET /storage/objects/*` (auth-required), `GET /storage/public-objects/*` (open).
+- Web upload flow: `Hub.tsx` calls the request-url endpoint, PUTs the file directly to GCS, then references the returned `objectPath` in the `attachments` array of `POST /hub`.
 
 ## Telegram
 

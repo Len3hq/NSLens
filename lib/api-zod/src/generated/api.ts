@@ -327,10 +327,38 @@ export const ListPostsResponseItem = zod.object({
   authorId: zod.string(),
   authorName: zod.string(),
   content: zod.string(),
+  attachments: zod.array(
+    zod.object({
+      type: zod.enum(["image", "video", "link", "file"]),
+      objectPath: zod.string().nullish(),
+      url: zod.string().nullish(),
+      mimeType: zod.string().nullish(),
+      caption: zod.string().nullish(),
+      ogTitle: zod.string().nullish(),
+      ogDescription: zod.string().nullish(),
+      ogImage: zod.string().nullish(),
+      aiDescription: zod.string().nullish(),
+    }),
+  ),
   createdAt: zod.coerce.date(),
 });
 export const ListPostsResponse = zod.array(ListPostsResponseItem);
 
 export const CreatePostBody = zod.object({
   content: zod.string(),
+  attachments: zod
+    .array(
+      zod.object({
+        type: zod.enum(["image", "video", "link", "file"]),
+        objectPath: zod.string().nullish(),
+        url: zod.string().nullish(),
+        mimeType: zod.string().nullish(),
+        caption: zod.string().nullish(),
+        ogTitle: zod.string().nullish(),
+        ogDescription: zod.string().nullish(),
+        ogImage: zod.string().nullish(),
+        aiDescription: zod.string().nullish(),
+      }),
+    )
+    .optional(),
 });

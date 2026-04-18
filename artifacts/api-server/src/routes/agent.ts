@@ -3,9 +3,7 @@ import { requireAuth } from "../lib/auth";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { extractFromText, persistEntities } from "./ingest";
 import { answerWithMemory } from "./chat";
-import { db, postsTable, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
-import { fanOutPost } from "./hub";
+import { createHubPost } from "./hub";
 
 const router: IRouter = Router();
 
@@ -58,31 +56,13 @@ export async function runAgent(
     return { intent, reply: result.answer, result: { sources: result.sources } };
   }
   if (intent === "POST") {
-    const [post] = await db
-      .insert(postsTable)
-      .values({ authorId: userId, content: message.trim() })
-      .returning();
-    const [author] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, userId))
-      .limit(1);
-    fanOutPost({
-      id: post.id,
-      authorId: post.authorId,
-      content: post.content,
-      authorName: author?.name ?? author?.email ?? "Someone",
-    }).catch(() => {});
+    // Strip a leading "post:" prefix if present.
+    const cleaned = message.replace(/^\s*post\s*:\s*/i, "").trim();
+    const created = await createHubPost(userId, cleaned, []);
     return {
       intent,
       reply: `Posted to the Founders Hub. Your network will be notified if relevant.`,
-      result: {
-        id: post.id,
-        authorId: post.authorId,
-        authorName: author?.name ?? author?.email ?? "You",
-        content: post.content,
-        createdAt: post.createdAt,
-      },
+      result: created,
     };
   }
   return {

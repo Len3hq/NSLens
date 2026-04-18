@@ -165,16 +165,62 @@ export interface RunRemindersResult {
   notifications: Notification[];
 }
 
+export type PostAttachmentType =
+  (typeof PostAttachmentType)[keyof typeof PostAttachmentType];
+
+export const PostAttachmentType = {
+  image: "image",
+  video: "video",
+  link: "link",
+  file: "file",
+} as const;
+
+export interface PostAttachment {
+  type: PostAttachmentType;
+  /** @nullable */
+  objectPath?: string | null;
+  /** @nullable */
+  url?: string | null;
+  /** @nullable */
+  mimeType?: string | null;
+  /** @nullable */
+  caption?: string | null;
+  /** @nullable */
+  ogTitle?: string | null;
+  /** @nullable */
+  ogDescription?: string | null;
+  /** @nullable */
+  ogImage?: string | null;
+  /** @nullable */
+  aiDescription?: string | null;
+}
+
 export interface Post {
   id: number;
   authorId: string;
   authorName: string;
   content: string;
+  attachments: PostAttachment[];
   createdAt: string;
 }
 
 export interface CreatePostInput {
   content: string;
+  attachments?: PostAttachment[];
+}
+
+export interface RequestUploadUrlInput {
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  size?: number | null;
+  /** @nullable */
+  contentType?: string | null;
+}
+
+export interface RequestUploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
 }
 
 export interface TelegramStatus {
