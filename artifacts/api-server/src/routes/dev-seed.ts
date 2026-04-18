@@ -11,6 +11,7 @@ import {
 import { and, eq, inArray, like } from "drizzle-orm";
 import { fanOutPost } from "./hub";
 import { evaluateReminders } from "./reminders";
+import { backfillEmbeddings } from "../lib/embeddings";
 
 const router: IRouter = Router();
 
@@ -244,7 +245,10 @@ router.post("/dev/seed", requireAuth, async (req, res) => {
     });
   }
 
-  // 5. Run reminders to surface the stale contacts
+  // 5. Embed all newly seeded contacts + interactions (idempotent — only fills nulls).
+  await backfillEmbeddings();
+
+  // 6. Run reminders to surface the stale contacts
   const r = await evaluateReminders(userId);
   summary.remindersFlagged = r.flagged;
 

@@ -3,6 +3,7 @@ import { requireAuth } from "../lib/auth";
 import { db, contactsTable, interactionsTable, type Contact } from "@workspace/db";
 import { and, eq, ilike } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
+import { embedAndSetContact, embedAndSetInteraction } from "../lib/embeddings";
 
 const router: IRouter = Router();
 
@@ -97,13 +98,23 @@ async function persistEntities(
         .where(and(eq(contactsTable.id, existing.id), eq(contactsTable.userId, userId)))
         .returning();
       updated.push(u);
-      await db.insert(interactionsTable).values({
-        userId,
-        contactId: existing.id,
-        content: rawText.slice(0, 4000),
-        source,
-        occurredAt: validDate,
-      });
+      const [interaction] = await db
+        .insert(interactionsTable)
+        .values({
+          userId,
+          contactId: existing.id,
+          content: rawText.slice(0, 4000),
+          source,
+          occurredAt: validDate,
+        })
+        .returning();
+      // Re-embed the contact (any field may have changed) and embed the new interaction.
+      embedAndSetContact(u.id).catch((err) =>
+        console.error("embed contact failed", { contactId: u.id, err }),
+      );
+      embedAndSetInteraction(interaction.id).catch((err) =>
+        console.error("embed interaction failed", { interactionId: interaction.id, err }),
+      );
     } else {
       const [c] = await db
         .insert(contactsTable)
@@ -118,13 +129,22 @@ async function persistEntities(
         })
         .returning();
       created.push(c);
-      await db.insert(interactionsTable).values({
-        userId,
-        contactId: c.id,
-        content: rawText.slice(0, 4000),
-        source,
-        occurredAt: validDate,
-      });
+      const [interaction] = await db
+        .insert(interactionsTable)
+        .values({
+          userId,
+          contactId: c.id,
+          content: rawText.slice(0, 4000),
+          source,
+          occurredAt: validDate,
+        })
+        .returning();
+      embedAndSetContact(c.id).catch((err) =>
+        console.error("embed contact failed", { contactId: c.id, err }),
+      );
+      embedAndSetInteraction(interaction.id).catch((err) =>
+        console.error("embed interaction failed", { interactionId: interaction.id, err }),
+      );
     }
   }
   return { created, updated };

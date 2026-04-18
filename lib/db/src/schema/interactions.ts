@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, index, vector } from "drizzle-orm/pg-core";
 
 export const interactionsTable = pgTable(
   "interactions",
@@ -9,10 +9,13 @@ export const interactionsTable = pgTable(
     content: text("content").notNull(),
     source: text("source").notNull().default("note"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    embedding: vector("embedding", { dimensions: 384 }),
   },
   (t) => [
     index("interactions_user_idx").on(t.userId),
     index("interactions_contact_idx").on(t.contactId),
+    index("interactions_embedding_idx")
+      .using("hnsw", t.embedding.op("vector_cosine_ops")),
   ],
 );
 

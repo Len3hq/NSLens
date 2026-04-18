@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, index, vector } from "drizzle-orm/pg-core";
 
 export const contactsTable = pgTable(
   "contacts",
@@ -11,13 +11,18 @@ export const contactsTable = pgTable(
     context: text("context"),
     tags: text("tags").array().notNull().default([]),
     lastInteractionAt: timestamp("last_interaction_at", { withTimezone: true }),
+    embedding: vector("embedding", { dimensions: 384 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [index("contacts_user_idx").on(t.userId)],
+  (t) => [
+    index("contacts_user_idx").on(t.userId),
+    index("contacts_embedding_idx")
+      .using("hnsw", t.embedding.op("vector_cosine_ops")),
+  ],
 );
 
 export type Contact = typeof contactsTable.$inferSelect;
