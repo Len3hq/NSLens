@@ -9,7 +9,7 @@ import {
   friendshipsTable,
   followUpsTable,
 } from "@workspace/db";
-import { like, or, inArray, sql } from "drizzle-orm";
+import { like, or, inArray } from "drizzle-orm";
 
 // One-shot admin endpoint to wipe seeded mock data from production. Guarded by
 // a hardcoded throwaway token. This route is intended to be called once and
@@ -51,14 +51,27 @@ router.post("/admin/wipe-seed-data", async (req, res) => {
       .where(like(contactsTable.userId, `${SEED_PREFIX}%`));
     const seedContactIds = seedContacts.map((c) => c.id);
 
-    // Notifications: by seed user OR referencing a seed post / seed contact.
-    const notifDel = await db.execute(sql`
-      DELETE FROM notifications
-      WHERE user_id LIKE ${SEED_PREFIX + "%"}
-         OR (post_id IS NOT NULL AND post_id = ANY(${seedPostIds}::int[]))
-         OR (contact_id IS NOT NULL AND contact_id = ANY(${seedContactIds}::int[]))
-    `);
-    before.notifications = (notifDel as { rowCount?: number }).rowCount ?? 0;
+    // Notifications: by seed user, OR referencing a seed post, OR referencing
+    // a seed contact. Run as three statements to keep the parameter binding
+    // simple and portable.
+    let notifTotal = 0;
+    const r1 = await db
+      .delete(notificationsTable)
+      .where(like(notificationsTable.userId, `${SEED_PREFIX}%`));
+    notifTotal += (r1 as unknown as { rowCount?: number }).rowCount ?? 0;
+    if (seedPostIds.length) {
+      const r2 = await db
+        .delete(notificationsTable)
+        .where(inArray(notificationsTable.postId, seedPostIds));
+      notifTotal += (r2 as unknown as { rowCount?: number }).rowCount ?? 0;
+    }
+    if (seedContactIds.length) {
+      const r3 = await db
+        .delete(notificationsTable)
+        .where(inArray(notificationsTable.contactId, seedContactIds));
+      notifTotal += (r3 as unknown as { rowCount?: number }).rowCount ?? 0;
+    }
+    before.notifications = notifTotal;
 
     if (seedPostIds.length) {
       const r = await db.delete(postsTable).where(inArray(postsTable.id, seedPostIds));
