@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, MessageSquare, AlarmClock, Bell, Plus } from "lucide-react";
 import { toast } from "sonner";
+import TelegramCard from "@/components/TelegramCard";
 
 export default function Dashboard() {
   const { data, isLoading } = useGetDashboard();
@@ -82,6 +83,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <TelegramCard />
     </div>
   );
 }
