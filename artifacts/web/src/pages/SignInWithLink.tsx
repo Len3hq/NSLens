@@ -9,20 +9,22 @@ import { toast } from "sonner";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type Phase = "enter" | "sending" | "waiting";
+type Phase = "enter" | "sending" | "code";
+type Mode = "signIn" | "signUp";
 
 export default function SignInWithLink() {
   const clerk = useClerk();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [phase, setPhase] = useState<Phase>("enter");
-  const cancelFlow = useRef<(() => void) | null>(null);
+  const [mode, setMode] = useState<Mode>("signIn");
+  const [verifying, setVerifying] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    return () => {
-      cancelFlow.current?.();
-    };
-  }, []);
+    if (phase === "code") inputRef.current?.focus();
+  }, [phase]);
 
   if (!clerk.loaded) {
     return (
@@ -31,8 +33,6 @@ export default function SignInWithLink() {
       </div>
     );
   }
-
-  const verifyUrl = `${window.location.origin}${basePath}/verify`;
 
   function errMsg(err: any, fallback: string) {
     return (
@@ -54,83 +54,111 @@ export default function SignInWithLink() {
     const signIn = client.signIn;
     const signUp = client.signUp;
 
-    // 1. Try to sign in (existing user)
+    // 1. Try sign-in
     try {
       const created = await signIn.create({ identifier: emailAddress });
       const factor = created.supportedFirstFactors?.find(
-        (f: any) => f.strategy === "email_link",
+        (f: any) => f.strategy === "email_code",
       ) as { emailAddressId: string } | undefined;
       if (!factor) {
-        toast.error("Email link sign-in isn't enabled on this account.");
+        toast.error("Email code sign-in isn't enabled for this account.");
         setPhase("enter");
         return;
       }
-      const { startEmailLinkFlow, cancelEmailLinkFlow } =
-        signIn.createEmailLinkFlow();
-      cancelFlow.current = cancelEmailLinkFlow;
-      setPhase("waiting");
-      const result = await startEmailLinkFlow({
+      await signIn.prepareFirstFactor({
+        strategy: "email_code",
         emailAddressId: factor.emailAddressId,
-        redirectUrl: verifyUrl,
       });
-      cancelFlow.current = null;
-      if (result.status === "complete" && result.createdSessionId) {
-        await clerk.setActive({ session: result.createdSessionId });
-        setLocation("/app");
-        return;
-      }
-      // If verified in another tab, the session may already be active
-      if (result.status === "complete" || (result as any).status === "expired") {
-        if ((result as any).status === "expired") {
-          toast.error("That link expired. Please request a new one.");
-          setPhase("enter");
-          return;
-        }
-      }
-      // Verified elsewhere
-      setLocation("/app");
+      setMode("signIn");
+      setPhase("code");
       return;
     } catch (err: any) {
       const code = err?.errors?.[0]?.code;
       if (code !== "form_identifier_not_found") {
-        toast.error(errMsg(err, "Couldn't send link. Try again."));
+        toast.error(errMsg(err, "Couldn't send code. Try again."));
         setPhase("enter");
         return;
       }
-      // fall through to sign-up
+      // fall through → sign-up
     }
 
-    // 2. New user — sign-up flow
+    // 2. New user — sign-up
     try {
       await signUp.create({ emailAddress });
-      const { startEmailLinkFlow, cancelEmailLinkFlow } =
-        signUp.createEmailLinkFlow();
-      cancelFlow.current = cancelEmailLinkFlow;
-      setPhase("waiting");
-      const result = await startEmailLinkFlow({ redirectUrl: verifyUrl });
-      cancelFlow.current = null;
-      const v = (result as any).verifications?.emailAddress;
-      if (v?.status === "expired") {
-        toast.error("That link expired. Please request a new one.");
-        setPhase("enter");
-        return;
-      }
-      if (result.status === "complete" && result.createdSessionId) {
-        await clerk.setActive({ session: result.createdSessionId });
-        setLocation("/app");
-        return;
-      }
-      // Verified in another tab
-      setLocation("/app");
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setMode("signUp");
+      setPhase("code");
     } catch (err: any) {
       toast.error(errMsg(err, "Couldn't create your account."));
       setPhase("enter");
     }
   }
 
+  async function verifyCode(otp: string) {
+    setVerifying(true);
+    const client = clerk.client;
+    if (!client) {
+      toast.error("Auth not ready, please reload.");
+      setVerifying(false);
+      return;
+    }
+    try {
+      if (mode === "signIn") {
+        const result = await client.signIn.attemptFirstFactor({
+          strategy: "email_code",
+          code: otp,
+        });
+        if (result.status === "complete" && result.createdSessionId) {
+          await clerk.setActive({ session: result.createdSessionId });
+          setLocation("/app");
+        } else {
+          toast.error("Couldn't sign you in. Please try again.");
+          setVerifying(false);
+        }
+      } else {
+        const result = await client.signUp.attemptEmailAddressVerification({
+          code: otp,
+        });
+        if (result.status === "complete" && result.createdSessionId) {
+          await clerk.setActive({ session: result.createdSessionId });
+          setLocation("/app");
+        } else {
+          toast.error("Couldn't finish sign-up. Please try again.");
+          setVerifying(false);
+        }
+      }
+    } catch (err: any) {
+      toast.error(errMsg(err, "Invalid or expired code."));
+      setVerifying(false);
+    }
+  }
+
+  async function resend() {
+    const client = clerk.client;
+    if (!client) return;
+    try {
+      if (mode === "signIn") {
+        const factor = client.signIn.supportedFirstFactors?.find(
+          (f: any) => f.strategy === "email_code",
+        ) as { emailAddressId: string } | undefined;
+        if (!factor) throw new Error("No email factor found.");
+        await client.signIn.prepareFirstFactor({
+          strategy: "email_code",
+          emailAddressId: factor.emailAddressId,
+        });
+      } else {
+        await client.signUp.prepareEmailAddressVerification({
+          strategy: "email_code",
+        });
+      }
+      toast.success("New code sent.");
+    } catch (err: any) {
+      toast.error(errMsg(err, "Couldn't resend code."));
+    }
+  }
+
   function reset() {
-    cancelFlow.current?.();
-    cancelFlow.current = null;
+    setCode("");
     setPhase("enter");
   }
 
@@ -147,7 +175,7 @@ export default function SignInWithLink() {
               Sign in to Network Brain
             </h1>
             <p className="mb-6 text-center text-sm text-muted-foreground">
-              Enter your email and we'll send you a link to sign in. No password needed.
+              Enter your email and we'll send you a one-time code. No password needed.
             </p>
             <form
               onSubmit={(e) => {
@@ -176,15 +204,15 @@ export default function SignInWithLink() {
                 type="submit"
                 className="w-full"
                 disabled={phase === "sending" || !email.trim()}
-                data-testid="send-link-button"
+                data-testid="send-code-button"
               >
                 {phase === "sending" ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending link…
+                    Sending code…
                   </>
                 ) : (
-                  "Send sign-in link"
+                  "Send sign-in code"
                 )}
               </Button>
               <p className="text-center text-xs text-muted-foreground">
@@ -193,31 +221,80 @@ export default function SignInWithLink() {
             </form>
           </>
         ) : (
-          <div className="text-center" data-testid="waiting-panel">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <MailCheck className="h-6 w-6 text-primary" />
+          <div data-testid="code-panel">
+            <div className="mb-4 flex justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <MailCheck className="h-6 w-6 text-primary" />
+              </div>
             </div>
-            <h1 className="mb-1 text-2xl font-semibold tracking-tight">
+            <h1 className="mb-1 text-center text-2xl font-semibold tracking-tight">
               Check your email
             </h1>
-            <p className="mb-6 text-sm text-muted-foreground">
-              We sent a sign-in link to{" "}
-              <span className="font-medium text-foreground">{email}</span>. Click it to
-              finish signing in. You can open it on this device or any other — we'll log
-              you in automatically.
+            <p className="mb-6 text-center text-sm text-muted-foreground">
+              We sent a 6-digit code to{" "}
+              <span className="font-medium text-foreground">{email}</span>.
             </p>
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Waiting for confirmation…
-            </div>
-            <button
-              type="button"
-              onClick={reset}
-              className="mt-6 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (code.length >= 6) verifyCode(code.trim());
+              }}
+              className="space-y-4"
             >
-              <ArrowLeft className="mr-1 h-3 w-3" />
-              Use a different email
-            </button>
+              <div className="space-y-2">
+                <Label htmlFor="code">Verification code</Label>
+                <Input
+                  id="code"
+                  ref={inputRef}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={code}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                    setCode(v);
+                    if (v.length === 6 && !verifying) verifyCode(v);
+                  }}
+                  className="text-center text-lg tracking-[0.5em]"
+                  disabled={verifying}
+                  data-testid="code-input"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={verifying || code.length < 6}
+                data-testid="verify-code-button"
+              >
+                {verifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying…
+                  </>
+                ) : (
+                  "Verify and sign in"
+                )}
+              </Button>
+            </form>
+            <div className="mt-6 flex items-center justify-between text-sm">
+              <button
+                type="button"
+                onClick={reset}
+                className="inline-flex items-center text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="mr-1 h-3 w-3" />
+                Use a different email
+              </button>
+              <button
+                type="button"
+                onClick={resend}
+                className="text-primary hover:underline"
+              >
+                Resend code
+              </button>
+            </div>
           </div>
         )}
       </div>
