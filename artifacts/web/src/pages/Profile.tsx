@@ -300,7 +300,7 @@ function FriendsSection() {
             <p className="text-xs text-muted-foreground">Loading…</p>
           ) : (friends.data ?? []).length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              You haven't added any friends yet. Search above to find people on Network Brain.
+              You haven't added any friends yet. Search above to find people on NS Lens.
             </p>
           ) : (
             <div className="grid sm:grid-cols-2 gap-2">

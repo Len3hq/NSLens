@@ -152,7 +152,7 @@ function AddPanel({ onClose }: { onClose: () => void }) {
             <Textarea placeholder="Context (where you met, what they're up to)" value={context} onChange={(e) => setContext(e.target.value)} />
             <div className="space-y-2 border rounded-md p-3 bg-muted/30">
               <p className="text-xs text-muted-foreground">
-                Add their handles so we can match them when they post on Network Brain — even before
+                Add their handles so we can match them when they post on NS Lens — even before
                 you connect as friends.
               </p>
               <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />

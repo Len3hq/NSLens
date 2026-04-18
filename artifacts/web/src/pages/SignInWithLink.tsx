@@ -228,13 +228,13 @@ export default function SignInWithLink() {
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-xl">
         <div className="mb-6 flex justify-center">
-          <img src={`${basePath}/logo.svg`} alt="Network Brain" className="h-10" />
+          <img src={`${basePath}/logo.svg`} alt="NS Lens" className="h-10" />
         </div>
 
         {phase === "enter" || phase === "sending" ? (
           <>
             <h1 className="mb-1 text-center text-2xl font-semibold tracking-tight">
-              Sign in to Network Brain
+              Sign in to NS Lens
             </h1>
             <p className="mb-6 text-center text-sm text-muted-foreground">
               Enter your email and we'll send you a one-time code. No password needed.

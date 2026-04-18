@@ -112,7 +112,7 @@ export default function PublicPost() {
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-2">
           <Megaphone className="w-5 h-5" />
           <span className="font-semibold">Founders Hub</span>
-          <span className="text-xs text-muted-foreground ml-auto">Network Brain</span>
+          <span className="text-xs text-muted-foreground ml-auto">NS Lens</span>
         </div>
       </header>
       <main className="max-w-2xl mx-auto p-6">
@@ -145,7 +145,7 @@ export default function PublicPost() {
         <p className="text-xs text-muted-foreground mt-6">
           You're viewing a shared post.{" "}
           <a href="/app" className="underline">
-            Open Network Brain
+            Open NS Lens
           </a>{" "}
           to reply or post your own.
         </p>

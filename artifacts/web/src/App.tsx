@@ -42,13 +42,13 @@ const clerkAppearance = {
     logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
   },
   variables: {
-    colorPrimary: "hsl(252, 84%, 67%)",
-    colorBackground: "hsl(0, 0%, 100%)",
-    colorInputBackground: "hsl(0, 0%, 100%)",
-    colorText: "hsl(222, 47%, 11%)",
-    colorTextSecondary: "hsl(215, 16%, 47%)",
-    colorInputText: "hsl(222, 47%, 11%)",
-    colorNeutral: "hsl(222, 47%, 11%)",
+    colorPrimary: "hsl(258, 95%, 70%)",
+    colorBackground: "hsl(240, 12%, 8%)",
+    colorInputBackground: "hsl(240, 12%, 11%)",
+    colorText: "hsl(220, 14%, 96%)",
+    colorTextSecondary: "hsl(240, 6%, 65%)",
+    colorInputText: "hsl(220, 14%, 96%)",
+    colorNeutral: "hsl(220, 14%, 96%)",
     borderRadius: "0.75rem",
     fontFamily: "Inter, system-ui, sans-serif",
     fontFamilyButtons: "Inter, system-ui, sans-serif",
@@ -141,8 +141,8 @@ function ClerkProviderWithRoutes() {
       proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
       localization={{
-        signIn: { start: { title: "Welcome back", subtitle: "Sign in to your network brain" } },
-        signUp: { start: { title: "Build your network brain", subtitle: "It takes a few seconds" } },
+        signIn: { start: { title: "Welcome back", subtitle: "Sign in to NS Lens" } },
+        signUp: { start: { title: "Get your NS Lens", subtitle: "It takes a few seconds" } },
       }}
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}

@@ -45,7 +45,7 @@ export default function VerifyLink() {
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-xl">
         <div className="mb-6 flex justify-center">
-          <img src={`${basePath}/logo.svg`} alt="Network Brain" className="h-10" />
+          <img src={`${basePath}/logo.svg`} alt="NS Lens" className="h-10" />
         </div>
         {status === "verifying" && (
           <>
