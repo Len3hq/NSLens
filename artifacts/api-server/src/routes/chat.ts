@@ -83,18 +83,38 @@ export async function searchMemory(userId: string, query: string) {
 
 export async function answerWithMemory(userId: string, message: string) {
   const sources = await searchMemory(userId, message);
-  const context = sources.length
-    ? sources
-        .map(
-          (s, idx) =>
-            `[${idx + 1}] (${s.kind}) ${s.contactName} — ${s.snippet}`,
-        )
-        .join("\n")
-    : "(no matching memory)";
-  const systemPrompt = `You are Network Brain, a personal CRM assistant. Answer the user's question grounded in their memory below. Cite people by name. If memory is empty or doesn't cover the question, say so plainly. Be concise.
 
-MEMORY:
-${context}`;
+  // Baseline: always include a roster of the user's contacts so generic
+  // questions like "who's in my network?" work even when keyword search
+  // returns nothing.
+  const allContacts = await db
+    .select()
+    .from(contactsTable)
+    .where(eq(contactsTable.userId, userId))
+    .orderBy(desc(contactsTable.lastInteractionAt))
+    .limit(50);
+  const totalContacts = allContacts.length;
+  const rosterLines = allContacts.map(
+    (c) =>
+      `- ${c.name}${c.project ? ` — ${c.project}` : ""}${c.company ? ` @ ${c.company}` : ""}${c.context ? ` (${c.context})` : ""}${(c.tags ?? []).length ? ` [${(c.tags ?? []).join(", ")}]` : ""}`,
+  );
+  const roster = rosterLines.length
+    ? rosterLines.join("\n")
+    : "(the user has no saved contacts yet)";
+
+  const matches = sources.length
+    ? sources
+        .map((s, idx) => `[${idx + 1}] (${s.kind}) ${s.contactName} — ${s.snippet}`)
+        .join("\n")
+    : "(no specific keyword matches)";
+
+  const systemPrompt = `You are Network Brain, a personal CRM assistant. Answer the user's question grounded in the memory below. Always cite people by name. The CONTACT ROSTER is the authoritative list of everyone the user knows; use it for any "who do I know / list my network / who works on X" question. Use SPECIFIC MATCHES for additional context from past notes. Only say memory is empty if the roster itself is empty. Be concise.
+
+CONTACT ROSTER (${totalContacts} total):
+${roster}
+
+SPECIFIC MATCHES:
+${matches}`;
   const completion = await openai.chat.completions.create({
     model: CHAT_MODEL,
     messages: [
