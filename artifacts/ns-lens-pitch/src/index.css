@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-primary: var(--slide-primary);
+  --color-accent: var(--slide-accent);
+  --color-bg: var(--slide-bg);
+  --color-ink: var(--slide-ink);
+  --color-text: var(--slide-text);
+  --color-muted: var(--slide-muted);
+  --color-line: var(--slide-line);
+  --font-display: var(--font-display-family);
+  --font-serif: var(--font-serif-family);
+  --font-body: var(--font-body-family);
+}
+
+:root {
+  /* NS Lens brand: violet primary, cyan accent, deep ink background */
+  --slide-primary: #8b5cf6;
+  --slide-accent: #22d3ee;
+  --slide-bg: #0b0a14;
+  --slide-ink: #14121f;
+  --slide-text: #f5f3ff;
+  --slide-muted: #a39fbb;
+  --slide-line: #2a2640;
+  --font-display-family: "Inter", system-ui, sans-serif;
+  --font-serif-family: "Instrument Serif", Georgia, serif;
+  --font-body-family: "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--slide-bg);
+  color: var(--slide-text);
+  font-family: var(--font-body-family);
+  -webkit-font-smoothing: antialiased;
+}
+
+.slide {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.slide-viewer {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}

@@ -1,0 +1,31 @@
+kind = "slides"
+previewPath = "/ns-lens-pitch/"
+title = "NS Lens — Hackathon Pitch"
+version = "1.0.0"
+id = "artifacts/ns-lens-pitch"
+router = "path"
+
+[[integratedSkills]]
+name = "slides"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/ns-lens-pitch/" ]
+localPort = 23054
+
+[services.development]
+run = "pnpm --filter @workspace/ns-lens-pitch run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ns-lens-pitch", "run", "build" ]
+publicDir = "artifacts/ns-lens-pitch/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23054"
+BASE_PATH = "/ns-lens-pitch/"
