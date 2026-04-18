@@ -1,11 +1,17 @@
 import { pgTable, serial, text, integer, timestamp, index } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
+import { contactsTable } from "./contacts";
 
 export const followUpsTable = pgTable(
   "follow_ups",
   {
     id: serial("id").primaryKey(),
-    userId: text("user_id").notNull(),
-    contactId: integer("contact_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    contactId: integer("contact_id")
+      .notNull()
+      .references(() => contactsTable.id, { onDelete: "cascade" }),
     dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
     note: text("note"),
     source: text("source").notNull().default("manual"),

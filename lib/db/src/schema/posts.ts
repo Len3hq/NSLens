@@ -1,4 +1,5 @@
 import { pgTable, text, serial, timestamp, index, jsonb } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
 
 export type PostAttachment = {
   // "image" / "video" come from direct file uploads (objectPath set).
@@ -23,7 +24,9 @@ export const postsTable = pgTable(
   "posts",
   {
     id: serial("id").primaryKey(),
-    authorId: text("author_id").notNull(),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
     attachments: jsonb("attachments").$type<PostAttachment[]>().notNull().default([]),
     // Combined searchable text: content + extracted attachment context. Used

@@ -1,15 +1,26 @@
 import { pgTable, text, serial, timestamp, integer, index, boolean } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
+import { contactsTable } from "./contacts";
+import { postsTable } from "./posts";
 
 export const notificationsTable = pgTable(
   "notifications",
   {
     id: serial("id").primaryKey(),
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
     type: text("type").notNull(),
     title: text("title").notNull(),
     body: text("body").notNull(),
-    contactId: integer("contact_id"),
-    postId: integer("post_id"),
+    // If the referenced contact / post is deleted we just null out the link;
+    // the notification itself can stay readable in the user's history.
+    contactId: integer("contact_id").references(() => contactsTable.id, {
+      onDelete: "set null",
+    }),
+    postId: integer("post_id").references(() => postsTable.id, {
+      onDelete: "set null",
+    }),
     // Short, ready-to-send Telegram body (with link). Set when this notification
     // should also be sent over Telegram. The pump function flushes these in
     // batches of 3 so users aren't overwhelmed.

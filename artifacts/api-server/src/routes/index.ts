@@ -17,6 +17,7 @@ import friendsRouter from "./friends";
 import followupsRouter from "./followups";
 import priorityRouter from "./priority";
 import calendarRouter from "./calendar";
+import adminFkMigrateRouter from "./admin-fk-migrate";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(friendsRouter);
 router.use(followupsRouter);
 router.use(priorityRouter);
 router.use(calendarRouter);
+router.use(adminFkMigrateRouter);
 
 export default router;

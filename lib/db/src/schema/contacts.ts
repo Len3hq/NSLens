@@ -1,10 +1,13 @@
 import { pgTable, text, serial, timestamp, index, vector, boolean } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
 
 export const contactsTable = pgTable(
   "contacts",
   {
     id: serial("id").primaryKey(),
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     project: text("project"),
     company: text("company"),
