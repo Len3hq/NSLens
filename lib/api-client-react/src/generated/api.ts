@@ -37,6 +37,7 @@ import type {
   Notification,
   Post,
   RunRemindersResult,
+  SeedResult,
   SimpleOk,
   TelegramLinkCode,
   TelegramStatus,
@@ -1270,6 +1271,156 @@ export const useRunReminders = <
   TContext
 > => {
   return useMutation(getRunRemindersMutationOptions(options));
+};
+
+export const getSeedMockDataUrl = () => {
+  return `/api/dev/seed`;
+};
+
+export const seedMockData = async (
+  options?: RequestInit,
+): Promise<SeedResult> => {
+  return customFetch<SeedResult>(getSeedMockDataUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSeedMockDataMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof seedMockData>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof seedMockData>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["seedMockData"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof seedMockData>>,
+    void
+  > = () => {
+    return seedMockData(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SeedMockDataMutationResult = NonNullable<
+  Awaited<ReturnType<typeof seedMockData>>
+>;
+
+export type SeedMockDataMutationError = ErrorType<unknown>;
+
+export const useSeedMockData = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof seedMockData>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof seedMockData>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getSeedMockDataMutationOptions(options));
+};
+
+export const getClearMockDataUrl = () => {
+  return `/api/dev/seed/clear`;
+};
+
+export const clearMockData = async (
+  options?: RequestInit,
+): Promise<SimpleOk> => {
+  return customFetch<SimpleOk>(getClearMockDataUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getClearMockDataMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearMockData>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clearMockData>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["clearMockData"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clearMockData>>,
+    void
+  > = () => {
+    return clearMockData(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClearMockDataMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clearMockData>>
+>;
+
+export type ClearMockDataMutationError = ErrorType<unknown>;
+
+export const useClearMockData = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearMockData>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof clearMockData>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getClearMockDataMutationOptions(options));
 };
 
 export const getGetTelegramStatusUrl = () => {

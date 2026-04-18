@@ -31,6 +31,8 @@ export * from "./me";
 export * from "./notification";
 export * from "./post";
 export * from "./runRemindersResult";
+export * from "./seedResult";
+export * from "./seedResultSummary";
 export * from "./simpleOk";
 export * from "./telegramLinkCode";
 export * from "./telegramStatus";

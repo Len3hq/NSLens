@@ -286,6 +286,22 @@ export const RunRemindersResponse = zod.object({
   ),
 });
 
+export const SeedMockDataResponse = zod.object({
+  ok: zod.boolean(),
+  summary: zod.object({
+    contacts: zod.number(),
+    interactions: zod.number(),
+    posts: zod.number(),
+    peers: zod.number(),
+    peerPosts: zod.number(),
+    remindersFlagged: zod.number(),
+  }),
+});
+
+export const ClearMockDataResponse = zod.object({
+  ok: zod.boolean(),
+});
+
 export const GetTelegramStatusResponse = zod.object({
   linked: zod.boolean(),
   chatId: zod.string().nullish(),

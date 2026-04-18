@@ -18,6 +18,7 @@ tags:
   - name: hub
   - name: dashboard
   - name: telegram
+  - name: dev
 
 paths:
   /healthz:
@@ -275,6 +276,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunRemindersResult"
+
+  /dev/seed:
+    post:
+      operationId: seedMockData
+      tags: [dev]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeedResult"
+  /dev/seed/clear:
+    post:
+      operationId: clearMockData
+      tags: [dev]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleOk"
 
   /me/telegram:
     get:
@@ -563,6 +587,22 @@ components:
         botUsername: { type: ["string", "null"] }
         deepLink: { type: ["string", "null"] }
       required: [linkCode, expiresAt]
+
+    SeedResult:
+      type: object
+      properties:
+        ok: { type: boolean }
+        summary:
+          type: object
+          properties:
+            contacts: { type: integer }
+            interactions: { type: integer }
+            posts: { type: integer }
+            peers: { type: integer }
+            peerPosts: { type: integer }
+            remindersFlagged: { type: integer }
+          required: [contacts, interactions, posts, peers, peerPosts, remindersFlagged]
+      required: [ok, summary]
 
     SimpleOk:
       type: object

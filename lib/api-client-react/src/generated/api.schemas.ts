@@ -199,6 +199,20 @@ export interface TelegramLinkCode {
   deepLink?: string | null;
 }
 
+export type SeedResultSummary = {
+  contacts: number;
+  interactions: number;
+  posts: number;
+  peers: number;
+  peerPosts: number;
+  remindersFlagged: number;
+};
+
+export interface SeedResult {
+  ok: boolean;
+  summary: SeedResultSummary;
+}
+
 export interface SimpleOk {
   ok: boolean;
 }

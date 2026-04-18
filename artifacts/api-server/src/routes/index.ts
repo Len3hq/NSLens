@@ -11,6 +11,7 @@ import remindersRouter from "./reminders";
 import hubRouter from "./hub";
 import dashboardRouter from "./dashboard";
 import telegramRouter from "./telegram";
+import devSeedRouter from "./dev-seed";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(remindersRouter);
 router.use(hubRouter);
 router.use(dashboardRouter);
 router.use(telegramRouter);
+router.use(devSeedRouter);
 
 export default router;
