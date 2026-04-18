@@ -11,6 +11,8 @@ export interface Post {
   id: number;
   authorId: string;
   authorName: string;
+  /** @nullable */
+  authorUsername?: string | null;
   content: string;
   attachments: PostAttachment[];
   createdAt: Date;

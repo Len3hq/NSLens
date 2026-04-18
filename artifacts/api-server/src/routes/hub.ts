@@ -34,6 +34,7 @@ router.get("/hub/public/:id", async (req, res) => {
       createdAt: postsTable.createdAt,
       authorName: usersTable.name,
       authorEmail: usersTable.email,
+      authorUsername: usersTable.username,
     })
     .from(postsTable)
     .leftJoin(usersTable, eq(usersTable.id, postsTable.authorId))
@@ -49,7 +50,8 @@ router.get("/hub/public/:id", async (req, res) => {
     content: row.content,
     attachments: row.attachments ?? [],
     createdAt: row.createdAt,
-    authorName: row.authorName ?? row.authorEmail ?? "Anonymous",
+    authorName: row.authorName ?? row.authorUsername ?? row.authorEmail ?? "Anonymous",
+    authorUsername: row.authorUsername ?? null,
   });
 });
 
@@ -63,6 +65,7 @@ router.get("/hub", requireAuth, async (_req, res) => {
       createdAt: postsTable.createdAt,
       authorName: usersTable.name,
       authorEmail: usersTable.email,
+      authorUsername: usersTable.username,
     })
     .from(postsTable)
     .leftJoin(usersTable, eq(usersTable.id, postsTable.authorId))
@@ -75,7 +78,8 @@ router.get("/hub", requireAuth, async (_req, res) => {
       content: r.content,
       attachments: r.attachments ?? [],
       createdAt: r.createdAt,
-      authorName: r.authorName ?? r.authorEmail ?? "Anonymous",
+      authorName: r.authorName ?? r.authorUsername ?? r.authorEmail ?? "Anonymous",
+      authorUsername: r.authorUsername ?? null,
     })),
   );
 });

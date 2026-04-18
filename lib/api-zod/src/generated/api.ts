@@ -342,6 +342,7 @@ export const ListPostsResponseItem = zod.object({
   id: zod.number(),
   authorId: zod.string(),
   authorName: zod.string(),
+  authorUsername: zod.string().nullish(),
   content: zod.string(),
   attachments: zod.array(
     zod.object({

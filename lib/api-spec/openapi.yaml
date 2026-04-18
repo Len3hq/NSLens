@@ -581,6 +581,7 @@ components:
         id: { type: integer }
         authorId: { type: string }
         authorName: { type: string }
+        authorUsername: { type: ["string", "null"] }
         content: { type: string }
         attachments:
           type: array

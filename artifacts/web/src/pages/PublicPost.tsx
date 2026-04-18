@@ -17,6 +17,7 @@ type Attachment = {
 type PublicPost = {
   id: number;
   authorName: string;
+  authorUsername?: string | null;
   content: string | null;
   attachments: Attachment[];
   createdAt: string;
@@ -123,10 +124,17 @@ export default function PublicPost() {
         ) : (
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{post.authorName}</div>
-                <div className="text-xs text-muted-foreground">
-                  {new Date(post.createdAt).toLocaleString()}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-cyan-400 text-primary-foreground grid place-items-center text-sm font-semibold shrink-0">
+                  {((post.authorUsername || post.authorName || "?").replace(/^@/, "").charAt(0) || "?").toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">
+                    {post.authorUsername ? `@${post.authorUsername}` : post.authorName}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(post.createdAt).toLocaleString()}
+                  </div>
                 </div>
               </div>
             </CardHeader>
