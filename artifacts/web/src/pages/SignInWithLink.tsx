@@ -218,6 +218,7 @@ export default function SignInWithLink() {
               <p className="text-center text-xs text-muted-foreground">
                 We'll create an account automatically if you're new here.
               </p>
+              <div id="clerk-captcha" className="flex justify-center" />
             </form>
           </>
         ) : (
