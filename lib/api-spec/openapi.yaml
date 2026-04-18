@@ -1,36 +1,527 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Network Brain API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: contacts
+  - name: interactions
+  - name: ingest
+  - name: chat
+  - name: notifications
+  - name: reminders
+  - name: agent
+  - name: hub
+  - name: dashboard
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
-      summary: Health check
-      description: Returns server health status
       responses:
         "200":
-          description: Healthy
+          description: ok
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [contacts]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      tags: [contacts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContactInput"
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}:
+    get:
+      operationId: getContact
+      tags: [contacts]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactDetail"
+    patch:
+      operationId: updateContact
+      tags: [contacts]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContactInput"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+    delete:
+      operationId: deleteContact
+      tags: [contacts]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: deleted
+
+  /contacts/{id}/interactions:
+    post:
+      operationId: addInteraction
+      tags: [interactions]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddInteractionInput"
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Interaction"
+
+  /ingest/text:
+    post:
+      operationId: ingestText
+      tags: [ingest]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestTextInput"
+      responses:
+        "200":
+          description: extracted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestResult"
+
+  /ingest/image:
+    post:
+      operationId: ingestImage
+      tags: [ingest]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestImageInput"
+      responses:
+        "200":
+          description: extracted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestResult"
+
+  /chat:
+    post:
+      operationId: chatMemory
+      tags: [chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatInput"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+
+  /agent:
+    post:
+      operationId: agentMessage
+      tags: [agent]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentInput"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /reminders/run:
+    post:
+      operationId: runReminders
+      tags: [reminders]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunRemindersResult"
+
+  /hub:
+    get:
+      operationId: listPosts
+      tags: [hub]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+    post:
+      operationId: createPost
+      tags: [hub]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostInput"
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
 components:
   schemas:
     HealthStatus:
       type: object
       properties:
-        status:
-          type: string
-      required:
-        - status
+        status: { type: string }
+      required: [status]
 
+    Me:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: ["string", "null"] }
+        name: { type: ["string", "null"] }
+      required: [id]
+
+    Contact:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        project: { type: ["string", "null"] }
+        context: { type: ["string", "null"] }
+        company: { type: ["string", "null"] }
+        tags:
+          type: array
+          items: { type: string }
+        lastInteractionAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, tags, createdAt]
+
+    ContactDetail:
+      allOf:
+        - $ref: "#/components/schemas/Contact"
+        - type: object
+          properties:
+            interactions:
+              type: array
+              items:
+                $ref: "#/components/schemas/Interaction"
+          required: [interactions]
+
+    CreateContactInput:
+      type: object
+      properties:
+        name: { type: string }
+        project: { type: ["string", "null"] }
+        context: { type: ["string", "null"] }
+        company: { type: ["string", "null"] }
+        tags:
+          type: array
+          items: { type: string }
+      required: [name]
+
+    UpdateContactInput:
+      type: object
+      properties:
+        name: { type: string }
+        project: { type: ["string", "null"] }
+        context: { type: ["string", "null"] }
+        company: { type: ["string", "null"] }
+        tags:
+          type: array
+          items: { type: string }
+
+    Interaction:
+      type: object
+      properties:
+        id: { type: integer }
+        contactId: { type: integer }
+        content: { type: string }
+        source: { type: string }
+        occurredAt: { type: string, format: date-time }
+      required: [id, contactId, content, source, occurredAt]
+
+    AddInteractionInput:
+      type: object
+      properties:
+        content: { type: string }
+        source: { type: ["string", "null"] }
+      required: [content]
+
+    IngestTextInput:
+      type: object
+      properties:
+        text: { type: string }
+      required: [text]
+
+    IngestImageInput:
+      type: object
+      properties:
+        image:
+          type: string
+          description: data URL or base64 string of the image
+      required: [image]
+
+    IngestResult:
+      type: object
+      properties:
+        created:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        updated:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        rawExtraction:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractedEntity"
+      required: [created, updated, rawExtraction]
+
+    ExtractedEntity:
+      type: object
+      properties:
+        name: { type: string }
+        project: { type: ["string", "null"] }
+        company: { type: ["string", "null"] }
+        context: { type: ["string", "null"] }
+        date: { type: ["string", "null"] }
+      required: [name]
+
+    ChatInput:
+      type: object
+      properties:
+        message: { type: string }
+      required: [message]
+
+    ChatResponse:
+      type: object
+      properties:
+        answer: { type: string }
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatSource"
+      required: [answer, sources]
+
+    ChatSource:
+      type: object
+      properties:
+        kind: { type: string, enum: [contact, interaction] }
+        contactId: { type: integer }
+        contactName: { type: string }
+        snippet: { type: string }
+      required: [kind, contactId, contactName, snippet]
+
+    AgentInput:
+      type: object
+      properties:
+        message: { type: string }
+      required: [message]
+
+    AgentResponse:
+      type: object
+      properties:
+        intent: { type: string, enum: [INGEST, QUERY, POST, UNKNOWN] }
+        reply: { type: string }
+        result:
+          type: object
+          additionalProperties: true
+      required: [intent, reply]
+
+    Notification:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string }
+        title: { type: string }
+        body: { type: string }
+        contactId: { type: ["integer", "null"] }
+        postId: { type: ["integer", "null"] }
+        readAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, type, title, body, createdAt]
+
+    RunRemindersResult:
+      type: object
+      properties:
+        evaluated: { type: integer }
+        flagged: { type: integer }
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+      required: [evaluated, flagged, notifications]
+
+    Post:
+      type: object
+      properties:
+        id: { type: integer }
+        authorId: { type: string }
+        authorName: { type: string }
+        content: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, authorId, authorName, content, createdAt]
+
+    CreatePostInput:
+      type: object
+      properties:
+        content: { type: string }
+      required: [content]
+
+    Dashboard:
+      type: object
+      properties:
+        contactCount: { type: integer }
+        interactionCount: { type: integer }
+        staleCount: { type: integer }
+        unreadNotificationCount: { type: integer }
+        recentContacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        recentInteractions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Interaction"
+      required: [contactCount, interactionCount, staleCount, unreadNotificationCount, recentContacts, recentInteractions]
