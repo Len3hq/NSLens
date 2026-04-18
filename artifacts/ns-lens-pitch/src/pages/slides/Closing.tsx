@@ -20,7 +20,7 @@ export default function Closing() {
           </svg>
           <div className="font-display font-semibold text-[1.4vw] tracking-tight">NS Lens</div>
         </div>
-        <div className="text-[1.1vw] text-muted">08 / 08</div>
+        <div className="text-[1.1vw] text-muted">09 / 09</div>
       </div>
 
       {/* Centered hero */}

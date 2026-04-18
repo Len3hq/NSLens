@@ -56,8 +56,16 @@
     "speakerNotes": ""
   },
   {
-    "id": "8b1c0d4a-1111-4111-a111-000000000008",
+    "id": "8b1c0d4a-1111-4111-a111-000000000009",
     "position": 8,
+    "filepath": "src/pages/slides/ReplitWorkflow.tsx",
+    "title": "End-to-end on Replit",
+    "description": "Replit workflow that built and runs the app: prompt, scaffold, build, wire services, deploy.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "8b1c0d4a-1111-4111-a111-000000000008",
+    "position": 9,
     "filepath": "src/pages/slides/Closing.tsx",
     "title": "Don't lose another conversation",
     "description": "Closing slide with brand lockup and CTAs.",
