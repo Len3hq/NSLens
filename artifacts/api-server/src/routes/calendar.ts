@@ -28,8 +28,6 @@ async function getOrCreateToken(userId: string): Promise<string> {
   return token;
 }
 
-// Returns the per-user webcal://... and https URLs the user can paste into
-// Google Calendar / Apple Calendar / Outlook to subscribe to their follow-ups.
 router.get("/me/calendar", requireAuth, async (req, res) => {
   const token = await getOrCreateToken(req.userId!);
   const httpUrl = publicAppUrl(`/api/calendar/${token}.ics`);
@@ -55,11 +53,19 @@ router.post("/me/calendar/rotate", requireAuth, async (req, res) => {
 
 // ---- the actual ICS feed (no auth, token-gated) ----
 function escapeICS(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  // Strip CR characters first, then escape iCal special chars.
+  // CRLF is the iCal line separator, so bare \r or \r\n in values would inject
+  // new iCal lines. We remove \r entirely and encode \n as \\n (literal backslash-n).
+  return s
+    .replace(/\r/g, "")
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
 }
+
 function formatICSDate(d: Date): string {
   const iso = d.toISOString().replace(/[-:]/g, "");
-  // Strip milliseconds (.123Z → Z)
   return iso.replace(/\.\d{3}Z$/, "Z");
 }
 

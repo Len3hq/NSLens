@@ -1,11 +1,13 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
+import { llmRateLimit } from "../app";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { extractFromText, persistEntities } from "./ingest";
 import { answerWithMemory } from "./chat";
 import { createHubPost } from "./hub";
 import { db, contactsTable, followUpsTable } from "@workspace/db";
 import { and, eq, ilike, isNull, asc, sql } from "drizzle-orm";
+import { loadHistory, appendHistory, type HistoryMessage, type ChatSource } from "../lib/chatHistory";
 
 const router: IRouter = Router();
 
@@ -42,12 +44,13 @@ type Routed = {
   tag?: string;
 };
 
-async function classifyIntent(message: string): Promise<Routed> {
+async function classifyIntent(message: string, history: HistoryMessage[]): Promise<Routed> {
   try {
     const completion = await openai.chat.completions.create({
       model: CHAT_MODEL,
       messages: [
         { role: "system", content: ROUTER_PROMPT },
+        ...history,
         { role: "user", content: message },
       ],
       response_format: { type: "json_object" },
@@ -73,11 +76,13 @@ function fmtDate(d: Date): string {
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
-export async function runAgent(
+async function runAgentCore(
   userId: string,
   message: string,
+  source: ChatSource,
+  history: HistoryMessage[],
 ): Promise<{ intent: AgentIntent; reply: string; result: Record<string, unknown> }> {
-  const routed = await classifyIntent(message);
+  const routed = await classifyIntent(message, history);
   const intent = routed.intent;
 
   if (intent === "INGEST") {
@@ -90,7 +95,9 @@ export async function runAgent(
   }
 
   if (intent === "QUERY") {
-    const result = await answerWithMemory(userId, message);
+    // Pass pre-loaded history so answerWithMemory doesn't double-load.
+    // History saving happens in the runAgent wrapper after this returns.
+    const result = await answerWithMemory(userId, message, { history, source });
     return { intent, reply: result.answer, result: { sources: result.sources } };
   }
 
@@ -237,7 +244,21 @@ export async function runAgent(
   };
 }
 
-router.post("/agent", requireAuth, async (req, res) => {
+export async function runAgent(
+  userId: string,
+  message: string,
+  source: ChatSource = "web",
+): Promise<{ intent: AgentIntent; reply: string; result: Record<string, unknown> }> {
+  const history = await loadHistory(userId, 10);
+  const result = await runAgentCore(userId, message, source, history);
+  // QUERY already saved history inside answerWithMemory; save for all other intents here.
+  if (result.intent !== "QUERY") {
+    appendHistory(userId, message, result.reply, source).catch(() => {});
+  }
+  return result;
+}
+
+router.post("/agent", requireAuth, llmRateLimit, async (req, res) => {
   const { message } = req.body ?? {};
   if (!message || typeof message !== "string") {
     res.status(400).json({ error: "message is required" });

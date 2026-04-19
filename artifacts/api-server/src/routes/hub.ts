@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
+import { llmRateLimit } from "../app";
 import {
   db,
   postsTable,
@@ -11,6 +12,7 @@ import {
 import { desc, eq, ne, and, or, inArray, sql } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { enqueueTelegram } from "../lib/telegramQueue";
+import { enqueueDiscord } from "../lib/discordQueue";
 import { embedText, similarContacts } from "../lib/embeddings";
 
 const router: IRouter = Router();
@@ -50,7 +52,8 @@ router.get("/hub/public/:id", async (req, res) => {
     content: row.content,
     attachments: row.attachments ?? [],
     createdAt: row.createdAt,
-    authorName: row.authorName ?? row.authorUsername ?? row.authorEmail ?? "Anonymous",
+    // Never expose raw email on a public unauthenticated endpoint.
+    authorName: row.authorName ?? row.authorUsername ?? "Anonymous",
     authorUsername: row.authorUsername ?? null,
   });
 });
@@ -95,9 +98,9 @@ function publicObjectUrl(objectPath: string): string {
   return `${base.replace(/\/+$/, "")}/api/storage${objectPath}`;
 }
 
-// Block SSRF: only allow http(s), reject obvious internal hosts. We don't do
-// DNS resolution here (cheap heuristic), but we do block the most common
-// targets: localhost, *.internal, link-local 169.254.*, and the RFC1918 ranges.
+// Block SSRF: only allow http(s), reject obvious internal hosts.
+// Note: hostname-only checks cannot prevent DNS-rebinding attacks; for full
+// protection a resolving proxy or egress firewall is required in production.
 function isSafePublicUrl(raw: string): boolean {
   let u: URL;
   try {
@@ -106,26 +109,50 @@ function isSafePublicUrl(raw: string): boolean {
     return false;
   }
   if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+  // Reject numeric IPv6 addresses entirely — they bypass hostname checks.
+  if (u.hostname.startsWith("[")) return false;
   const host = u.hostname.toLowerCase();
   if (
     host === "localhost" ||
     host === "0.0.0.0" ||
+    host === "::1" ||
+    host === "::" ||
     host.endsWith(".local") ||
     host.endsWith(".internal") ||
+    host.endsWith(".localhost") ||
     host === "metadata.google.internal" ||
+    // IPv4 loopback (127.0.0.0/8)
     /^127\./.test(host) ||
+    // RFC1918 private ranges
     /^10\./.test(host) ||
     /^192\.168\./.test(host) ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    // Link-local
     /^169\.254\./.test(host) ||
-    host === "::1" ||
-    host.startsWith("fc") ||
-    host.startsWith("fd") ||
-    host.startsWith("fe80")
+    // APIPA / cloud metadata variations
+    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)
   ) {
     return false;
   }
   return true;
+}
+
+// Simple bounded-concurrency runner — prevents fan-out from spawning
+// hundreds of simultaneous OpenAI calls when many users are registered.
+async function runWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<T[]> {
+  const results: (T | undefined)[] = new Array(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const i = next++;
+      results[i] = await tasks[i]();
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results as T[];
 }
 
 async function describeImage(imageUrl: string, caption?: string): Promise<string> {
@@ -314,8 +341,8 @@ export async function fanOutPost(post: {
   };
   const matches: Match[] = [];
 
-  await Promise.all(
-    others.map(async (u) => {
+  await runWithConcurrency(
+    others.map((u) => async () => {
       const handleHit = handleMatches.get(u.id);
       const candidates = await similarContacts(u.id, queryEmbedding, 6);
       const filtered = candidates.filter((c) => (c.similarity ?? 0) >= 0.2);
@@ -393,22 +420,28 @@ export async function fanOutPost(post: {
         score: filtered[0]?.similarity ?? 0,
       });
     }),
+    5, // max 5 concurrent OpenAI relevance calls during fan-out
   );
 
-  // Queue a SHORT Telegram message for every linked recipient — the queue
-  // itself enforces the 3-at-a-time cap and the "want more?" follow-up.
-  // The /hub/p/:id route is public so recipients can read without logging in.
+  // Queue notifications for every linked recipient via Telegram and Discord.
   const postUrl = publicAppUrl(`/hub/p/${post.id}`);
-  await Promise.all(
-    matches
+  const sorted = matches.sort((a, b) => b.score - a.score);
+  await Promise.all([
+    ...sorted
       .filter((m) => m.user.telegramChatId)
-      .sort((a, b) => b.score - a.score)
       .map((m) => {
         const oneLine = m.reason.replace(/\s+/g, " ").trim().slice(0, 140);
         const text = `🤝 ${oneLine}\n${postUrl}`;
         return enqueueTelegram(m.user.id, m.notificationId, text).catch(() => {});
       }),
-  );
+    ...sorted
+      .filter((m) => m.user.discordDmChannelId)
+      .map((m) => {
+        const oneLine = m.reason.replace(/\s+/g, " ").trim().slice(0, 140);
+        const text = `🤝 ${oneLine}\n${postUrl}`;
+        return enqueueDiscord(m.user.id, m.notificationId, text).catch(() => {});
+      }),
+  ]);
 }
 
 // ---------- Create post ----------
@@ -485,7 +518,7 @@ export async function createHubPost(
   };
 }
 
-router.post("/hub", requireAuth, async (req, res) => {
+router.post("/hub", requireAuth, llmRateLimit, async (req, res) => {
   const { content, attachments } = req.body ?? {};
   if (typeof content !== "string" && !Array.isArray(attachments)) {
     res.status(400).json({ error: "content or attachments is required" });

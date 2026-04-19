@@ -27,12 +27,16 @@ export const notificationsTable = pgTable(
     telegramText: text("telegram_text"),
     telegramQueued: boolean("telegram_queued").notNull().default(false),
     telegramSentAt: timestamp("telegram_sent_at", { withTimezone: true }),
+    discordText: text("discord_text"),
+    discordQueued: boolean("discord_queued").notNull().default(false),
+    discordSentAt: timestamp("discord_sent_at", { withTimezone: true }),
     readAt: timestamp("read_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("notifications_user_idx").on(t.userId),
     index("notifications_telegram_queue_idx").on(t.userId, t.telegramQueued),
+    index("notifications_discord_queue_idx").on(t.userId, t.discordQueued),
   ],
 );
 

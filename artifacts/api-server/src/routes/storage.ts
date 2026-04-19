@@ -3,6 +3,8 @@ import { Readable } from "stream";
 import type { RequestUploadUrlInput, RequestUploadUrlResponse } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuth } from "../lib/auth";
+import { db, postsTable } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -88,20 +90,20 @@ router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Resp
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 
-    // --- Protected route example (uncomment when using replit-auth) ---
-    // if (!req.isAuthenticated()) {
-    //   res.status(401).json({ error: "Unauthorized" });
-    //   return;
-    // }
-    // const canAccess = await objectStorageService.canAccessObjectEntity({
-    //   userId: req.user.id,
-    //   objectFile,
-    //   requestedPermission: ObjectPermission.READ,
-    // });
-    // if (!canAccess) {
-    //   res.status(403).json({ error: "Forbidden" });
-    //   return;
-    // }
+    // Ownership check: the object must be referenced by at least one post
+    // (Hub images/files are shared across all authenticated users — that's
+    // intentional). Objects with no corresponding post record are denied.
+    const [postRef] = await db
+      .select({ id: postsTable.id })
+      .from(postsTable)
+      .where(
+        sql`${postsTable.attachments} @> ${JSON.stringify([{ objectPath }])}::jsonb`,
+      )
+      .limit(1);
+    if (!postRef) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
 
     const response = await objectStorageService.downloadObject(objectFile);
 

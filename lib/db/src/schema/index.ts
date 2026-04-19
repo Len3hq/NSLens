@@ -5,3 +5,4 @@ export * from "./notifications";
 export * from "./posts";
 export * from "./friendships";
 export * from "./followups";
+export * from "./chatHistory";

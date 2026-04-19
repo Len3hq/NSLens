@@ -1,6 +1,7 @@
 import { logger } from "./logger";
 
 const API_BASE = "https://api.telegram.org";
+const MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024; // 20 MB — Telegram's own file size cap
 
 export function getTelegramToken(): string | null {
   return process.env["TELEGRAM_BOT_TOKEN"] ?? null;
@@ -68,7 +69,6 @@ export async function getTelegramBotInfo(): Promise<{ username?: string } | null
   return tg<{ username?: string }>("getMe", {});
 }
 
-// Resolve a Telegram file_id to a temporary download URL via getFile.
 export async function getTelegramFileUrl(fileId: string): Promise<string | null> {
   const token = getTelegramToken();
   if (!token) return null;
@@ -77,7 +77,6 @@ export async function getTelegramFileUrl(fileId: string): Promise<string | null>
   return `${API_BASE}/file/bot${token}/${file.file_path}`;
 }
 
-// Download bytes from a URL (used for Telegram-hosted media).
 export async function downloadFromUrl(url: string): Promise<{
   buffer: Buffer;
   contentType: string;
@@ -85,9 +84,35 @@ export async function downloadFromUrl(url: string): Promise<{
   try {
     const r = await fetch(url);
     if (!r.ok) return null;
-    const ab = await r.arrayBuffer();
+
+    // Reject if Content-Length already exceeds the cap.
+    const contentLength = Number(r.headers.get("content-length") ?? "0");
+    if (contentLength > MAX_DOWNLOAD_BYTES) {
+      logger.warn({ url, contentLength }, "downloadFromUrl: file too large, skipping");
+      return null;
+    }
+
+    // Stream with a byte counter so we abort if the server lies about size.
+    const reader = r.body?.getReader();
+    if (!reader) return null;
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > MAX_DOWNLOAD_BYTES) {
+          reader.cancel();
+          logger.warn({ url, total }, "downloadFromUrl: exceeded size cap mid-stream, aborting");
+          return null;
+        }
+        chunks.push(value);
+      }
+    }
+
     return {
-      buffer: Buffer.from(ab),
+      buffer: Buffer.concat(chunks),
       contentType: r.headers.get("content-type") ?? "application/octet-stream",
     };
   } catch (err) {

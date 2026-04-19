@@ -6,6 +6,7 @@ import {
   getWebhookSecret,
   setTelegramWebhook,
 } from "./lib/telegram";
+import { startDiscordBot } from "./lib/discordBot";
 import { backfillEmbeddings } from "./lib/embeddings";
 
 const rawPort = process.env["PORT"];
@@ -41,6 +42,9 @@ app.listen(port, async (err) => {
       logger.warn("telegram bot token is set but no public URL was found");
     }
   }
+
+  // Start Discord bot (Gateway WebSocket) if token is configured.
+  startDiscordBot().catch((err) => logger.error({ err }, "discord bot failed to start"));
 
   // Backfill any contacts/interactions missing embeddings. Runs once on boot
   // and is a no-op when everything is already embedded.

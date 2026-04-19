@@ -1,11 +1,22 @@
 import { Router, type IRouter } from "express";
+import express from "express";
 import { requireAuth } from "../lib/auth";
 import { db, contactsTable, interactionsTable, type Contact } from "@workspace/db";
 import { and, eq, ilike } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { embedAndSetContact, embedAndSetInteraction } from "../lib/embeddings";
+import { llmRateLimit } from "../app";
 
 const router: IRouter = Router();
+
+const MAX_TEXT_LENGTH = 20_000;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB decoded
+const ALLOWED_IMAGE_PREFIXES = [
+  "data:image/jpeg;base64,",
+  "data:image/png;base64,",
+  "data:image/webp;base64,",
+  "data:image/gif;base64,",
+];
 
 type ExtractedEntity = {
   name: string;
@@ -108,7 +119,6 @@ async function persistEntities(
           occurredAt: validDate,
         })
         .returning();
-      // Re-embed the contact (any field may have changed) and embed the new interaction.
       embedAndSetContact(u.id).catch((err) =>
         console.error("embed contact failed", { contactId: u.id, err }),
       );
@@ -150,10 +160,14 @@ async function persistEntities(
   return { created, updated };
 }
 
-router.post("/ingest/text", requireAuth, async (req, res) => {
+router.post("/ingest/text", requireAuth, llmRateLimit, async (req, res) => {
   const { text } = req.body ?? {};
   if (!text || typeof text !== "string") {
     res.status(400).json({ error: "text is required" });
+    return;
+  }
+  if (text.length > MAX_TEXT_LENGTH) {
+    res.status(400).json({ error: `text must be ≤ ${MAX_TEXT_LENGTH} characters` });
     return;
   }
   const entities = await extractFromText(text);
@@ -161,21 +175,40 @@ router.post("/ingest/text", requireAuth, async (req, res) => {
   res.json({ created, updated, rawExtraction: entities });
 });
 
-router.post("/ingest/image", requireAuth, async (req, res) => {
-  const { image } = req.body ?? {};
-  if (!image || typeof image !== "string") {
-    res.status(400).json({ error: "image (data URL) is required" });
-    return;
-  }
-  const entities = await extractFromImage(image);
-  const { created, updated } = await persistEntities(
-    req.userId!,
-    entities,
-    "[image upload]",
-    "image",
-  );
-  res.json({ created, updated, rawExtraction: entities });
-});
+// Use a dedicated 20 MB body parser only for the image endpoint.
+router.post(
+  "/ingest/image",
+  requireAuth,
+  llmRateLimit,
+  express.json({ limit: "20mb" }),
+  async (req, res) => {
+    const { image } = req.body ?? {};
+    if (!image || typeof image !== "string") {
+      res.status(400).json({ error: "image (data URL) is required" });
+      return;
+    }
+    const hasValidPrefix = ALLOWED_IMAGE_PREFIXES.some((p) => image.startsWith(p));
+    if (!hasValidPrefix) {
+      res.status(400).json({ error: "image must be a base64 data URL of a supported image type (jpeg, png, webp, gif)" });
+      return;
+    }
+    const commaIdx = image.indexOf(",");
+    const base64Data = commaIdx !== -1 ? image.slice(commaIdx + 1) : "";
+    const approxBytes = Math.floor(base64Data.length * 0.75);
+    if (approxBytes > MAX_IMAGE_BYTES) {
+      res.status(400).json({ error: "image must be ≤ 20 MB" });
+      return;
+    }
+    const entities = await extractFromImage(image);
+    const { created, updated } = await persistEntities(
+      req.userId!,
+      entities,
+      "[image upload]",
+      "image",
+    );
+    res.json({ created, updated, rawExtraction: entities });
+  },
+);
 
 export { extractFromText, persistEntities };
 export default router;

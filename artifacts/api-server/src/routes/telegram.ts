@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { randomBytes } from "node:crypto";
 import { requireAuth } from "../lib/auth";
 import { db, usersTable, notificationsTable } from "@workspace/db";
 import { and, eq, gt } from "drizzle-orm";
@@ -108,10 +109,12 @@ async function collectTelegramAttachments(message: {
 }
 
 function genCode(): string {
-  // 8-char base32-ish, easy to type on mobile
+  // 8-char base32-ish, easy to type on mobile — uses crypto.randomBytes for
+  // unpredictability (Math.random() is not a CSPRNG).
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(8);
   let out = "";
-  for (let i = 0; i < 8; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < 8; i++) out += alphabet[bytes[i] % alphabet.length];
   return out;
 }
 
@@ -175,7 +178,7 @@ router.post("/telegram/webhook", async (req, res) => {
 
   try {
     // /start <code> → link this chat to a Network Brain account
-    const startMatch = text.match(/^\/start(?:\s+([A-Z0-9]{6,12}))?\s*$/i);
+    const startMatch = text.match(/^\/start(?:\s+([A-Z0-9]{8}))?\s*$/i);
     if (startMatch) {
       const code = startMatch[1]?.toUpperCase();
       if (!code) {
@@ -244,18 +247,18 @@ router.post("/telegram/webhook", async (req, res) => {
     }
 
     if (text === "/followups") {
-      const out = await runAgent(user.id, "show my follow-ups");
+      const out = await runAgent(user.id, "show my follow-ups", "telegram");
       await sendTelegramMessage(chatId, out.reply);
       return;
     }
     if (text === "/priority") {
-      const out = await runAgent(user.id, "who matters most in my network");
+      const out = await runAgent(user.id, "who matters most in my network", "telegram");
       await sendTelegramMessage(chatId, out.reply);
       return;
     }
     const tagMatch = text.match(/^\/tag\s+(\S.*)$/i);
     if (tagMatch) {
-      const out = await runAgent(user.id, `show me my ${tagMatch[1].trim()} contacts`);
+      const out = await runAgent(user.id, `show me my ${tagMatch[1].trim()} contacts`, "telegram");
       await sendTelegramMessage(chatId, out.reply);
       return;
     }
@@ -323,7 +326,7 @@ router.post("/telegram/webhook", async (req, res) => {
     }
 
     // Otherwise → run through the agent router
-    const out = await runAgent(user.id, text);
+    const out = await runAgent(user.id, text, "telegram");
     await sendTelegramMessage(chatId, out.reply);
   } catch (err) {
     req.log?.error({ err }, "telegram webhook handler failed");

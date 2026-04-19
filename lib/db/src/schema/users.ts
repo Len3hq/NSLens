@@ -20,6 +20,9 @@ export const usersTable = pgTable(
     // True when we've sent the user a "you have N more updates, reply YES"
     // message and are waiting on a reply before flushing more.
     telegramAwaitingMore: boolean("telegram_awaiting_more").notNull().default(false),
+    // Discord DM bot — set on first message, used for proactive delivery.
+    discordDmChannelId: text("discord_dm_channel_id"),
+    discordAwaitingMore: boolean("discord_awaiting_more").notNull().default(false),
     // Random opaque token used to authorize the per-user iCal feed at
     // /api/calendar/<token>.ics so it works in Google/Apple/Outlook calendar
     // subscriptions without a real auth header.

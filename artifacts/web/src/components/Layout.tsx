@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Show, useClerk, useUser } from "@clerk/react";
-import { useListNotifications } from "@workspace/api-client-react";
+import { useListNotifications, useGetMe } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -30,7 +30,6 @@ const NAV = [
   { to: "/app/profile", label: "Profile", icon: UserCircle },
 ];
 
-// Items shown in the bottom tab bar on mobile (kept short for small screens).
 const MOBILE_TABS = [
   { to: "/app", label: "Home", icon: LayoutDashboard },
   { to: "/app/contacts", label: "People", icon: Users },
@@ -41,14 +40,13 @@ const MOBILE_TABS = [
 
 export function Layout({ children }: { children: ReactNode }) {
   const [loc] = useLocation();
-  const { signOut } = useClerk();
-  const { user } = useUser();
+  const { logout } = useAuth();
+  const { data: me } = useGetMe();
   const { data: notifs } = useListNotifications({ query: { refetchInterval: 30_000 } as any });
   const unread = (notifs ?? []).filter((n) => !n.readAt).length;
-  const initial = (user?.firstName?.[0] || user?.username?.[0] || user?.primaryEmailAddress?.emailAddress?.[0] || "?").toUpperCase();
+  const initial = ((me?.name ?? me?.username ?? me?.email ?? "?")[0] ?? "?").toUpperCase();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Close the drawer whenever the route changes.
   useEffect(() => { setDrawerOpen(false); }, [loc]);
 
   const navList = (onNavigate?: () => void) => (
@@ -89,10 +87,10 @@ export function Layout({ children }: { children: ReactNode }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-medium truncate">
-          {user?.firstName || user?.username || "You"}
+          {me?.name ?? me?.username ?? "You"}
         </div>
         <div className="text-[11px] text-muted-foreground truncate">
-          {user?.primaryEmailAddress?.emailAddress}
+          {me?.email ?? me?.discordUsername ?? ""}
         </div>
       </div>
       <Button
@@ -100,7 +98,7 @@ export function Layout({ children }: { children: ReactNode }) {
         size="icon"
         className="w-8 h-8 shrink-0"
         title="Sign out"
-        onClick={() => signOut({ redirectUrl: window.location.origin })}
+        onClick={logout}
       >
         <LogOut className="w-4 h-4" />
       </Button>
@@ -171,10 +169,9 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        {/* Main content. Pad bottom on mobile so the bottom tab bar doesn't cover content. */}
         <main className="flex-1 min-w-0 overflow-x-hidden pb-[env(safe-area-inset-bottom)] lg:pb-0">
           <div className="lg:pb-0 pb-20">
-            <Show when="signed-in">{children}</Show>
+            {children}
           </div>
         </main>
 

@@ -1,4 +1,4 @@
-import { getAuth, clerkClient } from "@clerk/express";
+import { verify } from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -13,18 +13,25 @@ declare global {
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const auth = getAuth(req);
-  const userId = (auth?.sessionClaims?.userId as string | undefined) || auth?.userId;
-  if (!userId) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
+
+  const token = authHeader.slice(7);
+  let userId: string;
+  try {
+    const payload = verify(token, process.env.SESSION_SECRET ?? "") as { sub?: string };
+    if (!payload.sub) throw new Error("missing sub");
+    userId = payload.sub;
+  } catch {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   req.userId = userId;
 
-  // Check the local user record. If missing, only recreate it when Clerk
-  // confirms the account still exists. This prevents "ghost" sessions for
-  // accounts that were deleted from Clerk: instead of silently re-inserting
-  // the row (which used to let deleted users keep using the API), we reject.
   try {
     const existing = await db
       .select({ id: usersTable.id })
@@ -33,26 +40,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       .limit(1);
 
     if (existing.length === 0) {
-      let clerkUser;
-      try {
-        clerkUser = await clerkClient.users.getUser(userId);
-      } catch {
-        // User no longer exists in Clerk — session is stale / account was deleted.
-        res.status(401).json({ error: "Account no longer exists" });
-        return;
-      }
-      const email = clerkUser.primaryEmailAddress?.emailAddress ?? null;
-      const name =
-        [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
-        clerkUser.username ||
-        null;
-      await db
-        .insert(usersTable)
-        .values({ id: userId, email, name })
-        .onConflictDoNothing();
+      res.status(401).json({ error: "Account no longer exists" });
+      return;
     }
   } catch (err) {
-    req.log?.warn({ err }, "user lookup failed");
+    req.log?.error({ err }, "user lookup failed — rejecting request");
+    res.status(503).json({ error: "Service temporarily unavailable" });
+    return;
   }
+
   next();
 }

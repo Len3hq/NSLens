@@ -149,24 +149,28 @@ router.patch("/contacts/:id", requireAuth, async (req, res) => {
 
 router.delete("/contacts/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
-  // Verify ownership before cascading
-  const [owner] = await db
-    .select({ id: contactsTable.id })
-    .from(contactsTable)
-    .where(and(eq(contactsTable.id, id), eq(contactsTable.userId, req.userId!)))
-    .limit(1);
-  if (!owner) {
-    res.status(404).end();
-    return;
-  }
-  await db.delete(interactionsTable).where(eq(interactionsTable.contactId, id));
-  await db
-    .delete(notificationsTable)
-    .where(and(eq(notificationsTable.userId, req.userId!), eq(notificationsTable.contactId, id)));
-  await db
-    .delete(contactsTable)
-    .where(and(eq(contactsTable.id, id), eq(contactsTable.userId, req.userId!)));
-  res.status(204).end();
+  const userId = req.userId!;
+  // tx has the same query interface as db; explicit cast resolves the implicit-any
+  // warning that arises when @workspace/db lib types are not pre-built.
+  await db.transaction(async (tx: typeof db) => {
+    const [owner] = await tx
+      .select({ id: contactsTable.id })
+      .from(contactsTable)
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.userId, userId)))
+      .limit(1);
+    if (!owner) {
+      res.status(404).end();
+      return;
+    }
+    await tx.delete(interactionsTable).where(eq(interactionsTable.contactId, id));
+    await tx
+      .delete(notificationsTable)
+      .where(and(eq(notificationsTable.userId, userId), eq(notificationsTable.contactId, id)));
+    await tx
+      .delete(contactsTable)
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.userId, userId)));
+    res.status(204).end();
+  });
 });
 
 export default router;

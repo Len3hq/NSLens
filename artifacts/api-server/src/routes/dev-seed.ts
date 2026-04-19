@@ -251,6 +251,10 @@ async function materializeAttachments(
 }
 
 router.post("/dev/seed", requireAuth, async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(403).json({ error: "Seed endpoint is disabled in production" });
+    return;
+  }
   const userId = req.userId!;
   const summary = {
     contacts: 0,
@@ -346,6 +350,10 @@ router.post("/dev/seed", requireAuth, async (req, res) => {
 });
 
 router.post("/dev/seed/clear", requireAuth, async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(403).json({ error: "Seed endpoint is disabled in production" });
+    return;
+  }
   const userId = req.userId!;
   // Active user's data
   await db.delete(notificationsTable).where(eq(notificationsTable.userId, userId));

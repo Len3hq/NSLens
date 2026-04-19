@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import { clerkClient } from "@clerk/express";
 import { requireAuth } from "../lib/auth";
 import {
   db,
@@ -100,9 +99,7 @@ router.patch("/me", requireAuth, async (req, res) => {
 router.delete("/me", requireAuth, async (req, res) => {
   const userId = req.userId!;
 
-  // 1. Read the chat id up front (we'll need it for the goodbye after Clerk
-  //    delete succeeds — but we must NOT message the user until we know the
-  //    delete actually happened, otherwise we'd lie if Clerk fails).
+  // 1. Read the chat id for the goodbye message (best-effort).
   let telegramChatId: string | null = null;
   try {
     const [u] = await db
@@ -115,24 +112,7 @@ router.delete("/me", requireAuth, async (req, res) => {
     req.log?.warn({ err }, "telegram chat id lookup failed (non-fatal)");
   }
 
-  // 2. Delete in Clerk. This is the only thing that actually invalidates
-  //    sessions and blocks future logins — without it the user can keep
-  //    signing in via magic link. Bail before any local destruction if Clerk
-  //    rejects, so the account stays consistent across systems.
-  try {
-    await clerkClient.users.deleteUser(userId);
-  } catch (err: unknown) {
-    const status = (err as { status?: number })?.status;
-    if (status !== 404 && status !== 410) {
-      req.log?.error({ err }, "clerk user delete failed");
-      res.status(502).json({ error: "Could not delete account with auth provider" });
-      return;
-    }
-    // 404/410 means already gone in Clerk — fall through and clean up locally.
-  }
-
-  // 3. Now that the account is truly gone in Clerk, send the goodbye on
-  //    Telegram (best-effort).
+  // 2. Send goodbye on Telegram (best-effort).
   if (telegramChatId) {
     try {
       await sendTelegramMessage(
@@ -144,7 +124,7 @@ router.delete("/me", requireAuth, async (req, res) => {
     }
   }
 
-  // 4. Tear down the Telegram link explicitly (clears chat id, link codes,
+  // 3. Tear down the Telegram link explicitly (clears chat id, link codes,
   //    awaiting-more flag, and any queued telegram notifications). This is
   //    redundant with the user-row delete below, but keeps the contract
   //    consistent with the HTTP and /unlink command paths and races safely
@@ -155,7 +135,7 @@ router.delete("/me", requireAuth, async (req, res) => {
     req.log?.warn({ err }, "telegram disconnect failed (non-fatal)");
   }
 
-  // 5. Cascade local data. Drop everything tied to this user across the app.
+  // 4. Cascade local data. Drop everything tied to this user across the app.
   try {
     await db.delete(notificationsTable).where(eq(notificationsTable.userId, userId));
     await db.delete(interactionsTable).where(eq(interactionsTable.userId, userId));

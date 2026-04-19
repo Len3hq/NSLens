@@ -1,9 +1,11 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
+import { llmRateLimit } from "../app";
 import { db, contactsTable, interactionsTable } from "@workspace/db";
 import { and, eq, ilike, or, sql, desc } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { embedText, similarContacts, similarInteractions } from "../lib/embeddings";
+import { loadHistory, appendHistory, type HistoryMessage, type ChatSource } from "../lib/chatHistory";
 
 const router: IRouter = Router();
 
@@ -125,8 +127,15 @@ export async function searchMemory(userId: string, query: string) {
   return sources;
 }
 
-export async function answerWithMemory(userId: string, message: string) {
-  const sources = await searchMemory(userId, message);
+export async function answerWithMemory(
+  userId: string,
+  message: string,
+  opts: { history?: HistoryMessage[]; source?: ChatSource } = {},
+) {
+  const [sources, history] = await Promise.all([
+    searchMemory(userId, message),
+    opts.history !== undefined ? Promise.resolve(opts.history) : loadHistory(userId, 10),
+  ]);
 
   // Baseline: always include a roster of the user's contacts so generic
   // questions like "who's in my network?" work even when keyword search
@@ -166,20 +175,28 @@ ${matches}`;
     model: CHAT_MODEL,
     messages: [
       { role: "system", content: systemPrompt },
+      ...history,
       { role: "user", content: message },
     ],
   });
   const answer = completion.choices[0]?.message?.content ?? "I couldn't generate a response.";
+
+  // Persist the exchange so all future calls (web, Telegram, Discord) share context.
+  // Only save when we own the history (i.e. not pre-loaded by runAgent which saves itself).
+  if (opts.history === undefined) {
+    appendHistory(userId, message, answer, opts.source ?? "web").catch(() => {});
+  }
+
   return { answer, sources };
 }
 
-router.post("/chat", requireAuth, async (req, res) => {
+router.post("/chat", requireAuth, llmRateLimit, async (req, res) => {
   const { message } = req.body ?? {};
   if (!message || typeof message !== "string") {
     res.status(400).json({ error: "message is required" });
     return;
   }
-  const result = await answerWithMemory(req.userId!, message);
+  const result = await answerWithMemory(req.userId!, message, { source: "web" });
   res.json(result);
 });
 
