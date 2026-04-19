@@ -1,13 +1,47 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { LensMark } from "@/components/Brand";
 import { Users, Sparkles, Megaphone, ArrowRight, CalendarClock, MessageCircle } from "lucide-react";
+import { FaDiscord } from "react-icons/fa";
 
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined ?? "").replace(/\/$/, "");
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader className="items-center text-center">
+          <img src={`${basePath}/logo.svg`} alt="NS Lens" className="h-9 mb-2" />
+          <DialogTitle className="text-xl">Sign in to NS Lens</DialogTitle>
+          <DialogDescription>
+            Network School members only — sign in with your Discord account.
+          </DialogDescription>
+        </DialogHeader>
+        <a
+          href={`${API_URL}/api/auth/discord`}
+          className="mt-2 flex w-full items-center justify-center gap-3 rounded-xl bg-[#5865F2] px-4 py-3 text-sm font-semibold text-white hover:bg-[#4752c4] transition-colors"
+        >
+          <FaDiscord className="h-5 w-5" />
+          Continue with Discord
+        </a>
+        <p className="text-center text-xs text-muted-foreground">
+          Only verified NS members can access NS Lens.
+        </p>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Home() {
+  const [authOpen, setAuthOpen] = useState(false);
+
   return (
     <div className="min-h-screen flex flex-col">
+      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+
       {/* Top bar */}
       <header className="sticky top-0 z-30 glass border-b border-border/60">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -24,12 +58,7 @@ export default function Home() {
             <a href={`${basePath}#how`} className="hover:text-foreground transition-colors">How it works</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/sign-in">
-              <Button variant="ghost" size="sm">Sign in</Button>
-            </Link>
-            <Link href="/sign-up">
-              <Button size="sm" className="rounded-full px-4">Get started</Button>
-            </Link>
+            <Button variant="ghost" size="sm" onClick={() => setAuthOpen(true)}>Sign in</Button>
           </div>
         </div>
       </header>
@@ -53,11 +82,9 @@ export default function Home() {
             and quietly nudges you when it's time to reach back out.
           </p>
           <div className="flex flex-wrap justify-center gap-3 pt-2">
-            <Link href="/sign-up">
-              <Button size="lg" className="rounded-full px-6 ring-glow">
-                Build your lens <ArrowRight className="w-4 h-4 ml-1.5" />
-              </Button>
-            </Link>
+            <Button size="lg" className="rounded-full px-6 ring-glow" onClick={() => setAuthOpen(true)}>
+              Build your lens <ArrowRight className="w-4 h-4 ml-1.5" />
+            </Button>
             <a href={`${basePath}#features`}>
               <Button size="lg" variant="outline" className="rounded-full px-6">How it works</Button>
             </a>
