@@ -11,7 +11,6 @@ function publicAppUrl(path: string): string {
   const base =
     process.env.PUBLIC_APP_URL ||
     process.env.PUBLIC_API_URL ||
-    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "") ||
     "http://localhost:5000";
   return `${base.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }

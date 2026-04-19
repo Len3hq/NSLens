@@ -10,8 +10,6 @@ export function getTelegramToken(): string | null {
 export function getPublicWebhookUrl(): string | null {
   const explicit = process.env["PUBLIC_API_URL"];
   if (explicit) return explicit.replace(/\/$/, "") + "/api/telegram/webhook";
-  const dev = process.env["REPLIT_DEV_DOMAIN"];
-  if (dev) return `https://${dev}/api/telegram/webhook`;
   return null;
 }
 

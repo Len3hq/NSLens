@@ -1,38 +1,9 @@
 import { db, contactsTable, interactionsTable } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { openai } from "./openai";
 
-// Local embedding model via transformers.js. The Replit AI integrations proxy
-// does not expose an embeddings endpoint, so we run a small sentence-transformer
-// in-process. Model is downloaded once on first call (~25MB) then cached.
-export const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
-export const EMBEDDING_DIMS = 384;
-
-let extractorPromise: Promise<(text: string | string[], opts?: unknown) => Promise<unknown>> | null =
-  null;
-
-async function getExtractor() {
-  if (!extractorPromise) {
-    const p = (async () => {
-      const { pipeline, env } = await import("@xenova/transformers");
-      // @ts-expect-error - allowLocalModels exists at runtime
-      env.allowLocalModels = false;
-      // @ts-expect-error - same
-      env.useBrowserCache = false;
-      const extractor = await pipeline("feature-extraction", EMBEDDING_MODEL);
-      return extractor as unknown as (
-        text: string | string[],
-        opts?: unknown,
-      ) => Promise<unknown>;
-    })();
-    // If model load fails, clear the cache so the next call can retry instead
-    // of being permanently broken with a rejected promise.
-    p.catch(() => {
-      if (extractorPromise === p) extractorPromise = null;
-    });
-    extractorPromise = p;
-  }
-  return extractorPromise;
-}
+export const EMBEDDING_MODEL = "text-embedding-3-small";
+export const EMBEDDING_DIMS = 1536;
 
 export function contactEmbeddingText(c: {
   name: string;
@@ -52,26 +23,15 @@ export function contactEmbeddingText(c: {
     .join(" • ");
 }
 
-function tensorToVectors(out: unknown, batchSize: number): number[][] {
-  // transformers.js returns a Tensor with `.data` (Float32Array) and `.dims`.
-  const t = out as { data: Float32Array; dims: number[] };
-  const flat = Array.from(t.data);
-  const dim = flat.length / batchSize;
-  const vectors: number[][] = [];
-  for (let i = 0; i < batchSize; i++) {
-    vectors.push(flat.slice(i * dim, (i + 1) * dim));
-  }
-  return vectors;
-}
-
 export async function embedText(text: string): Promise<number[] | null> {
   const trimmed = text.trim();
   if (!trimmed) return null;
   try {
-    const extractor = await getExtractor();
-    const out = await extractor(trimmed.slice(0, 8000), { pooling: "mean", normalize: true });
-    const [vec] = tensorToVectors(out, 1);
-    return vec ?? null;
+    const res = await openai.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: trimmed.slice(0, 8000),
+    });
+    return res.data[0].embedding;
   } catch (err) {
     console.error("embedText failed", err);
     return null;
@@ -90,12 +50,10 @@ export async function embedTexts(texts: string[]): Promise<(number[] | null)[]> 
   });
   if (!inputs.length) return texts.map(() => null);
   try {
-    const extractor = await getExtractor();
-    const out = await extractor(inputs, { pooling: "mean", normalize: true });
-    const vectors = tensorToVectors(out, inputs.length);
+    const res = await openai.embeddings.create({ model: EMBEDDING_MODEL, input: inputs });
     const result: (number[] | null)[] = texts.map(() => null);
     nonEmptyIdx.forEach((origIdx, i) => {
-      result[origIdx] = vectors[i] ?? null;
+      result[origIdx] = res.data[i]?.embedding ?? null;
     });
     return result;
   } catch (err) {

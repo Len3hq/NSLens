@@ -15,7 +15,7 @@ export const interactionsTable = pgTable(
     content: text("content").notNull(),
     source: text("source").notNull().default("note"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
-    embedding: vector("embedding", { dimensions: 384 }),
+    embedding: vector("embedding", { dimensions: 1536 }),
   },
   (t) => [
     index("interactions_user_idx").on(t.userId),

@@ -19,7 +19,7 @@ export const contactsTable = pgTable(
     tags: text("tags").array().notNull().default([]),
     starred: boolean("starred").default(false).notNull(),
     lastInteractionAt: timestamp("last_interaction_at", { withTimezone: true }),
-    embedding: vector("embedding", { dimensions: 384 }),
+    embedding: vector("embedding", { dimensions: 1536 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
