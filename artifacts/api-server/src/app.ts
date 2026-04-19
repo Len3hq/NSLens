@@ -1,7 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import path from "path";
@@ -11,16 +10,6 @@ import { logger } from "./lib/logger";
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : null;
-
-export const llmRateLimit = rateLimit({
-  windowMs: 60_000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => (req as express.Request & { userId?: string }).userId ?? req.ip ?? "anon",
-  message: { error: "Too many requests, please try again later." },
-  skip: () => process.env.NODE_ENV === "test",
-});
 
 const app: Express = express();
 

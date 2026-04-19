@@ -5,7 +5,7 @@ import { db, contactsTable, interactionsTable, type Contact } from "@workspace/d
 import { and, eq, ilike } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { embedAndSetContact, embedAndSetInteraction } from "../lib/embeddings";
-import { llmRateLimit } from "../app";
+import { llmRateLimit } from "../middlewares/rateLimits";
 
 const router: IRouter = Router();
 

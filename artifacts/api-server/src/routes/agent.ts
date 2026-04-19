@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { llmRateLimit } from "../app";
+import { llmRateLimit } from "../middlewares/rateLimits";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { extractFromText, persistEntities } from "./ingest";
 import { answerWithMemory } from "./chat";
