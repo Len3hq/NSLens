@@ -116,7 +116,6 @@ export default function Home() {
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
             One <span className="font-display gradient-text">lens</span> for everyone you know.
           </h2>
-          <p className="text-muted-foreground">Drop in a screenshot, a transcript, or a name. We do the rest.</p>
         </div>
         <div className="max-w-4xl mx-auto w-full">
           <video
