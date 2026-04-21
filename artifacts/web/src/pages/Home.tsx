@@ -118,14 +118,15 @@ export default function Home() {
           </h2>
           <p className="text-muted-foreground">Drop in a screenshot, a transcript, or a name. We do the rest.</p>
         </div>
-        <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-4">
-          {STEPS.map((s, i) => (
-            <div key={s.title} className="rounded-2xl border border-border bg-card/40 p-6 space-y-2">
-              <div className="text-xs font-mono text-primary">0{i + 1}</div>
-              <h3 className="font-semibold">{s.title}</h3>
-              <p className="text-sm text-muted-foreground">{s.body}</p>
-            </div>
-          ))}
+        <div className="max-w-4xl mx-auto w-full">
+          <video
+            src="/NSlensVideoDemo.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full rounded-2xl border border-border shadow-lg object-cover"
+          />
         </div>
       </section>
 
