@@ -19,7 +19,11 @@ const TOKEN_KEY = "ns_auth_token";
 
 function isTokenExpired(token: string): boolean {
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]!));
+    const part = token.split(".")[1]!;
+    // JWT uses base64url; atob requires standard base64 with padding
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=");
+    const payload = JSON.parse(atob(padded));
     return typeof payload.exp === "number" && payload.exp * 1000 < Date.now();
   } catch {
     return true;
