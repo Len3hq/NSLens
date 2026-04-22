@@ -10,7 +10,6 @@ const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET ?? "";
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI ?? "";
 const NS_AUTH_API_KEY = process.env.NS_AUTH_API_KEY ?? "";
 const SESSION_SECRET = process.env.SESSION_SECRET ?? "";
-const FRONTEND_URL = (process.env.PUBLIC_APP_URL ?? "http://localhost:22333").replace(/\/$/, "");
 
 const JWT_EXPIRY = "7d";
 const STATE_COOKIE = "discord_oauth_state";
@@ -42,7 +41,7 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
   const storedState = req.cookies?.[STATE_COOKIE];
 
   if (!code || !state || state !== storedState) {
-    res.redirect(`${FRONTEND_URL}/login?error=invalid_state`);
+    res.redirect(`/login?error=invalid_state`);
     return;
   }
   res.clearCookie(STATE_COOKIE);
@@ -69,7 +68,7 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
     discordAccessToken = tokenData.access_token;
   } catch (err) {
     req.log?.error({ err }, "Discord token exchange failed");
-    res.redirect(`${FRONTEND_URL}/login?error=discord_error`);
+    res.redirect(`/login?error=discord_error`);
     return;
   }
 
@@ -86,7 +85,7 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
     discordUsername = discordUser.username;
   } catch (err) {
     req.log?.error({ err }, "Discord user fetch failed");
-    res.redirect(`${FRONTEND_URL}/login?error=discord_error`);
+    res.redirect(`/login?error=discord_error`);
     return;
   }
 
@@ -105,12 +104,12 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
     nsProfile = (await nsRes.json()) as typeof nsProfile;
   } catch (err) {
     req.log?.error({ err }, "NS Auth verification failed");
-    res.redirect(`${FRONTEND_URL}/login?error=ns_error`);
+    res.redirect(`/login?error=ns_error`);
     return;
   }
 
   if (!nsProfile.member) {
-    res.redirect(`${FRONTEND_URL}/login?error=not_member`);
+    res.redirect(`/login?error=not_member`);
     return;
   }
 
@@ -135,12 +134,12 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
       });
   } catch (err) {
     req.log?.error({ err }, "DB upsert failed during auth callback");
-    res.redirect(`${FRONTEND_URL}/login?error=server_error`);
+    res.redirect(`/login?error=server_error`);
     return;
   }
 
   const token = sign({ sub: discordId }, SESSION_SECRET, { expiresIn: JWT_EXPIRY });
-  res.redirect(`${FRONTEND_URL}/auth/callback#token=${token}`);
+  res.redirect(`/auth/callback#token=${token}`);
 });
 
 export default router;
