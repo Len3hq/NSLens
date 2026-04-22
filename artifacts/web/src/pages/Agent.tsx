@@ -27,6 +27,7 @@ export default function AgentPage() {
   function send() {
     const text = input.trim();
     if (!text) return;
+    localStorage.setItem("ns_agent_tried", "1");
     setTurns((t) => [...t, { role: "user", text }]);
     agent.mutate({ data: { message: text } });
     setInput("");

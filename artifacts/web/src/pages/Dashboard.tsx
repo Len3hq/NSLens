@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import {
   useGetDashboard,
@@ -8,9 +9,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, MessageSquare, AlarmClock, Bell, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Users, MessageSquare, AlarmClock, Bell, Plus, Sparkles, Trash2, CheckCircle2, Circle, X, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import TelegramCard from "@/components/TelegramCard";
+import { WelcomeTour, TourTrigger } from "@/components/WelcomeTour";
 
 export default function Dashboard() {
   const { data, isLoading } = useGetDashboard();
@@ -49,6 +51,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <WelcomeTour />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -86,6 +89,13 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {!isLoading && (
+        <OnboardingChecklist
+          contactCount={d?.contactCount ?? 0}
+          interactionCount={d?.interactionCount ?? 0}
+        />
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={Users} label="Contacts" value={isLoading ? "..." : d?.contactCount ?? 0} />
@@ -134,6 +144,75 @@ export default function Dashboard() {
 
       <TelegramCard />
     </div>
+  );
+}
+
+function OnboardingChecklist({ contactCount, interactionCount }: { contactCount: number; interactionCount: number }) {
+  const [dismissed, setDismissed] = useState(
+    () => localStorage.getItem("ns_onboarding_dismissed") === "1",
+  );
+  const [agentTried] = useState(
+    () => localStorage.getItem("ns_agent_tried") === "1",
+  );
+
+  const steps = [
+    {
+      label: "Add your first contact",
+      description: "Paste notes, upload a screenshot, or fill in details manually.",
+      done: contactCount > 0,
+      href: "/app/contacts",
+    },
+    {
+      label: "Log an interaction",
+      description: "Open a contact and record a meeting, call, or message.",
+      done: interactionCount > 0,
+      href: "/app/contacts",
+    },
+    {
+      label: "Try the AI agent",
+      description: 'Tell the agent who you met or ask "who do I know in fintech?"',
+      done: agentTried,
+      href: "/app/agent",
+    },
+  ];
+
+  const allDone = steps.every((s) => s.done);
+
+  function dismiss() {
+    localStorage.setItem("ns_onboarding_dismissed", "1");
+    setDismissed(true);
+  }
+
+  if (dismissed || allDone) return null;
+
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <CardTitle className="text-base">Get started with NS Lens</CardTitle>
+        <Button variant="ghost" size="icon" className="w-7 h-7 -mr-1" onClick={dismiss} title="Dismiss">
+          <X className="w-4 h-4" />
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {steps.map((step) => (
+          <Link key={step.label} href={step.href}>
+            <div className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${step.done ? "opacity-50" : "hover:bg-primary/10"}`}>
+              {step.done
+                ? <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                : <Circle className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium ${step.done ? "line-through" : ""}`}>{step.label}</div>
+                {!step.done && <div className="text-xs text-muted-foreground mt-0.5">{step.description}</div>}
+              </div>
+              {!step.done && <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />}
+            </div>
+          </Link>
+        ))}
+        <div className="px-3 pb-1">
+          <TourTrigger />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
