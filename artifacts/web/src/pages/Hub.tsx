@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Megaphone, Send, Image as ImageIcon, Film, Link as LinkIcon, X, Paperclip, Plus } from "lucide-react";
+import { Megaphone, Send, Image as ImageIcon, Link as LinkIcon, X, Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { relativeTime, fullDateTime } from "@/lib/relativeTime";
 
@@ -59,8 +59,6 @@ function AttachmentChip({ a, onRemove }: { a: DraftAttachment; onRemove: () => v
           className="h-12 w-12 object-cover rounded"
           alt=""
         />
-      ) : a.type === "video" ? (
-        <Film className="w-5 h-5" />
       ) : a.type === "link" ? (
         <LinkIcon className="w-5 h-5" />
       ) : (
@@ -94,9 +92,7 @@ function AttachmentPreviewStrip({ attachments }: { attachments: PostAttachment[]
           <img src={first.ogImage} className="h-full w-full object-cover" alt="" />
         ) : (
           <div className="h-full w-full grid place-items-center text-muted-foreground">
-            {first.type === "video" ? (
-              <Film className="w-6 h-6" />
-            ) : first.type === "link" ? (
+            {first.type === "link" ? (
               <LinkIcon className="w-6 h-6" />
             ) : (
               <Paperclip className="w-6 h-6" />
@@ -150,11 +146,7 @@ export default function Hub() {
     try {
       for (const f of files) {
         const previewUrl = f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined;
-        const type: PostAttachment["type"] = f.type.startsWith("image/")
-          ? "image"
-          : f.type.startsWith("video/")
-            ? "video"
-            : "file";
+        const type: PostAttachment["type"] = f.type.startsWith("image/") ? "image" : "file";
         const { objectPath } = await uploadFile(f);
         setAttachments((prev) => [...prev, { type, objectPath, mimeType: f.type, previewUrl }]);
       }
@@ -218,7 +210,7 @@ export default function Hub() {
                   type="file"
                   hidden
                   multiple
-                  accept="image/*,video/*,application/pdf"
+                  accept="image/*"
                   onChange={onPickFiles}
                 />
                 <Button
@@ -228,7 +220,7 @@ export default function Hub() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
                 >
-                  <ImageIcon className="w-4 h-4 mr-1" /> Photo / video / file
+                  <ImageIcon className="w-4 h-4 mr-1" /> Add photo
                 </Button>
                 <div className="flex items-center gap-1 flex-1 min-w-[180px]">
                   <Input

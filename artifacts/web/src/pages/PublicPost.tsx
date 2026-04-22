@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Megaphone, Image as ImageIcon, Film, Link as LinkIcon, Paperclip } from "lucide-react";
+import { Megaphone, Image as ImageIcon, Film, Link as LinkIcon, Paperclip, ArrowLeft } from "lucide-react";
 import { relativeTime, fullDateTime } from "@/lib/relativeTime";
 
 type Attachment = {
@@ -112,6 +112,12 @@ export default function PublicPost() {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-2">
+          <button
+            onClick={() => window.history.back()}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mr-2"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
           <Megaphone className="w-5 h-5" />
           <span className="font-semibold">Founders Hub</span>
           <span className="text-xs text-muted-foreground ml-auto">NS Lens</span>
