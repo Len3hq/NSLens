@@ -1,6 +1,7 @@
 import { db, contactsTable, interactionsTable } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { openai } from "./openai";
+import { logger } from "./logger";
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMS = 1536;
@@ -33,7 +34,7 @@ export async function embedText(text: string): Promise<number[] | null> {
     });
     return res.data[0].embedding;
   } catch (err) {
-    console.error("embedText failed", err);
+    logger.error({ err }, "embedText failed");
     return null;
   }
 }
@@ -57,7 +58,7 @@ export async function embedTexts(texts: string[]): Promise<(number[] | null)[]> 
     });
     return result;
   } catch (err) {
-    console.error("embedTexts failed", err);
+    logger.error({ err }, "embedTexts failed");
     return texts.map(() => null);
   }
 }

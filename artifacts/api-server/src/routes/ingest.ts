@@ -6,6 +6,7 @@ import { and, eq, ilike } from "drizzle-orm";
 import { openai, CHAT_MODEL } from "../lib/openai";
 import { embedAndSetContact, embedAndSetInteraction } from "../lib/embeddings";
 import { llmRateLimit } from "../middlewares/rateLimits";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -120,10 +121,10 @@ async function persistEntities(
         })
         .returning();
       embedAndSetContact(u.id).catch((err) =>
-        console.error("embed contact failed", { contactId: u.id, err }),
+        logger.error({ contactId: u.id, err }, "embed contact failed"),
       );
       embedAndSetInteraction(interaction.id).catch((err) =>
-        console.error("embed interaction failed", { interactionId: interaction.id, err }),
+        logger.error({ interactionId: interaction.id, err }, "embed interaction failed"),
       );
     } else {
       const [c] = await db
@@ -150,10 +151,10 @@ async function persistEntities(
         })
         .returning();
       embedAndSetContact(c.id).catch((err) =>
-        console.error("embed contact failed", { contactId: c.id, err }),
+        logger.error({ contactId: c.id, err }, "embed contact failed"),
       );
       embedAndSetInteraction(interaction.id).catch((err) =>
-        console.error("embed interaction failed", { interactionId: interaction.id, err }),
+        logger.error({ interactionId: interaction.id, err }, "embed interaction failed"),
       );
     }
   }

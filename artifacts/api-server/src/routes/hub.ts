@@ -14,6 +14,7 @@ import { openai, CHAT_MODEL } from "../lib/openai";
 import { enqueueTelegram } from "../lib/telegramQueue";
 import { enqueueDiscord } from "../lib/discordQueue";
 import { embedText, similarContacts } from "../lib/embeddings";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -175,7 +176,7 @@ async function describeImage(imageUrl: string, caption?: string): Promise<string
     });
     return completion.choices[0]?.message?.content?.trim() ?? "";
   } catch (err) {
-    console.error("describeImage failed", err);
+    logger.error({ err }, "describeImage failed");
     return "";
   }
 }
@@ -186,7 +187,7 @@ async function fetchLinkPreview(url: string): Promise<{
   ogImage?: string;
 }> {
   if (!isSafePublicUrl(url)) {
-    console.warn("fetchLinkPreview: refused unsafe url", { url });
+    logger.warn({ url }, "fetchLinkPreview: refused unsafe url");
     return {};
   }
   try {
@@ -213,7 +214,7 @@ async function fetchLinkPreview(url: string): Promise<{
       ogImage: pick(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i),
     };
   } catch (err) {
-    console.error("fetchLinkPreview failed", { url, err });
+    logger.error({ url, err }, "fetchLinkPreview failed");
     return {};
   }
 }
@@ -274,7 +275,7 @@ export async function fanOutPost(post: {
 }) {
   const queryEmbedding = await embedText(post.searchableText);
   if (!queryEmbedding) {
-    console.error("fanOutPost: failed to embed post; skipping fan-out", { postId: post.id });
+    logger.error({ postId: post.id }, "fanOutPost: failed to embed post; skipping fan-out");
     return;
   }
   const others = await db
@@ -388,7 +389,7 @@ export async function fanOutPost(post: {
         reason = parsed.reason ?? "";
         matchedNames = Array.isArray(parsed.matchedNames) ? parsed.matchedNames : [];
       } catch (err) {
-        console.error("fanOutPost relevance call failed", { userId: u.id, postId: post.id, err });
+        logger.error({ userId: u.id, postId: post.id, err }, "fanOutPost relevance call failed");
         return;
       }
       if (!relevant) return;
@@ -502,7 +503,7 @@ export async function createHubPost(
         preview,
       });
     } catch (err) {
-      console.error("post enrichment / fan-out failed", { postId: post.id, err });
+      logger.error({ postId: post.id, err }, "post enrichment / fan-out failed");
     }
   })();
 
