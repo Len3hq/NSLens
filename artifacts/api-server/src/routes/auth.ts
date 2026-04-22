@@ -61,7 +61,10 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
         redirect_uri: DISCORD_REDIRECT_URI,
       }),
     });
-    if (!tokenRes.ok) throw new Error(`Discord token exchange failed: ${tokenRes.status}`);
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text().catch(() => "(unreadable)");
+      throw new Error(`Discord token exchange failed: ${tokenRes.status} — ${body}`);
+    }
     const tokenData = (await tokenRes.json()) as { access_token: string };
     discordAccessToken = tokenData.access_token;
   } catch (err) {
