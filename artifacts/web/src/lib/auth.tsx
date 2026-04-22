@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 
 interface AuthState {
@@ -40,25 +40,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return stored;
   });
 
-  function setToken(t: string) {
+  // Ref always holds the latest token so the async getter never reads a stale closure
+  const tokenRef = useRef(token);
+
+  // Stable references — useCallback with [] ensures these never change identity
+  // across renders. This is critical: AuthCallback's useEffect depends on setToken,
+  // and an unstable reference would re-fire the effect after the hash is cleared,
+  // sending the user to /login?error=no_token on every login attempt.
+  const setToken = useCallback((t: string) => {
+    tokenRef.current = t;
     localStorage.setItem(TOKEN_KEY, t);
     setTokenState(t);
-  }
+  }, []);
 
-  function logout() {
+  const logout = useCallback(() => {
+    tokenRef.current = null;
     localStorage.removeItem(TOKEN_KEY);
     setTokenState(null);
-  }
+  }, []);
 
+  // Registered once. Reads tokenRef.current so it always sees the latest token
+  // regardless of when the async fetch fires relative to React's effect flush.
   useEffect(() => {
     setAuthTokenGetter(async () => {
-      if (!token || isTokenExpired(token)) {
-        logout();
+      const t = tokenRef.current;
+      if (!t || isTokenExpired(t)) {
+        if (t) {
+          tokenRef.current = null;
+          localStorage.removeItem(TOKEN_KEY);
+          setTokenState(null);
+        }
         return null;
       }
-      return token;
+      return t;
     });
-  }, [token]);
+    return () => setAuthTokenGetter(null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AuthContext.Provider value={{ token, isLoggedIn: !!token, logout, setToken }}>
