@@ -4,6 +4,7 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import path from "path";
+import fs from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -50,8 +51,8 @@ app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 
 app.use("/api", router);
 
-if (process.env.NODE_ENV === "production") {
-  const publicDir = path.join(process.cwd(), "public");
+const publicDir = path.join(process.cwd(), "public");
+if (fs.existsSync(path.join(publicDir, "index.html"))) {
   app.use(express.static(publicDir));
   app.get("/{*path}", (_req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
