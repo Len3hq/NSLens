@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListPosts, useCreatePost, getListPostsQueryKey, customFetch } from "@workspace/api-client-react";
+import { useListPosts, useCreatePost, getListPostsQueryKey } from "@workspace/api-client-react";
 import type { PostAttachment, Post } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Megaphone, Send, Image as ImageIcon, Link as LinkIcon, X, Paperclip, Plus } from "lucide-react";
+import { Megaphone, Send, Link as LinkIcon, X, Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { relativeTime, fullDateTime } from "@/lib/relativeTime";
 
@@ -32,23 +32,6 @@ function authorInitial(p: { authorUsername?: string | null; authorName?: string 
   return src.replace(/^@/, "").charAt(0).toUpperCase();
 }
 
-async function uploadFile(file: File): Promise<{ objectPath: string }> {
-  const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
-    "/api/storage/uploads/request-url",
-    {
-      method: "POST",
-      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-      responseType: "json",
-    },
-  );
-  const put = await fetch(uploadURL, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-    body: file,
-  });
-  if (!put.ok) throw new Error("upload failed");
-  return { objectPath };
-}
 
 function AttachmentChip({ a, onRemove }: { a: DraftAttachment; onRemove: () => void }) {
   return (
@@ -118,8 +101,6 @@ export default function Hub() {
   const [content, setContent] = useState("");
   const [linkInput, setLinkInput] = useState("");
   const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data } = useListPosts({ query: { refetchInterval: 15_000 } as never });
   const posts = (data ?? []) as Post[];
@@ -138,26 +119,6 @@ export default function Hub() {
     },
   });
 
-  async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = "";
-    if (!files.length) return;
-    setIsUploading(true);
-    try {
-      for (const f of files) {
-        const previewUrl = f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined;
-        const type: PostAttachment["type"] = f.type.startsWith("image/") ? "image" : "file";
-        const { objectPath } = await uploadFile(f);
-        setAttachments((prev) => [...prev, { type, objectPath, mimeType: f.type, previewUrl }]);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Upload failed");
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
   function addLink() {
     const url = linkInput.trim();
     if (!url || !/^https?:\/\//i.test(url)) {
@@ -169,7 +130,7 @@ export default function Hub() {
   }
 
   const canPost =
-    !create.isPending && !isUploading && (content.trim().length > 0 || attachments.length > 0);
+    !create.isPending && (content.trim().length > 0 || attachments.length > 0);
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
@@ -205,23 +166,6 @@ export default function Hub() {
               />
 
               <div className="flex flex-wrap items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  hidden
-                  multiple
-                  accept="image/*"
-                  onChange={onPickFiles}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                >
-                  <ImageIcon className="w-4 h-4 mr-1" /> Add photo
-                </Button>
                 <div className="flex items-center gap-1 flex-1 min-w-[180px]">
                   <Input
                     placeholder="Paste a link…"
@@ -254,7 +198,7 @@ export default function Hub() {
             </div>
             <DialogFooter className="sm:justify-between sm:items-center gap-2">
               <span className="text-xs text-muted-foreground order-last sm:order-first">
-                {isUploading ? "Uploading…" : "Posts are public to your network."}
+                Posts are public to your network.
               </span>
               <Button
                 onClick={() =>
