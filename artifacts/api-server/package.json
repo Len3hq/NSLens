@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.19.0",
+    "@aws-sdk/client-s3": "^3.800.0",
+    "@aws-sdk/s3-request-presigner": "^3.800.0",
     "discord.js": "^14.16.3",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
