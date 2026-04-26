@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListPosts, useCreatePost, getListPostsQueryKey } from "@workspace/api-client-react";
-import type { PostAttachment, Post } from "@workspace/api-client-react";
+import { useListPosts, useCreatePost, getListPostsQueryKey, customFetch } from "@workspace/api-client-react";
+import type { PostAttachment, Post, RequestUploadUrlResponse } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Megaphone, Send, Link as LinkIcon, X, Paperclip, Plus } from "lucide-react";
+import { Megaphone, Send, Link as LinkIcon, X, Paperclip, Plus, ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { relativeTime, fullDateTime } from "@/lib/relativeTime";
 
@@ -101,6 +101,8 @@ export default function Hub() {
   const [content, setContent] = useState("");
   const [linkInput, setLinkInput] = useState("");
   const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data } = useListPosts({ query: { refetchInterval: 15_000 } as never });
   const posts = (data ?? []) as Post[];
@@ -129,8 +131,29 @@ export default function Hub() {
     setLinkInput("");
   }
 
+  async function uploadImage(file: File) {
+    setUploading(true);
+    try {
+      const { uploadURL, objectPath } = await customFetch<RequestUploadUrlResponse>(
+        "/api/storage/uploads/request-url",
+        {
+          method: "POST",
+          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        },
+      );
+      await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      const previewUrl = URL.createObjectURL(file);
+      setAttachments((prev) => [...prev, { type: "image", objectPath, mimeType: file.type, previewUrl }]);
+    } catch {
+      toast.error("Image upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   const canPost =
-    !create.isPending && (content.trim().length > 0 || attachments.length > 0);
+    !create.isPending && !uploading && (content.trim().length > 0 || attachments.length > 0);
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
@@ -182,6 +205,29 @@ export default function Hub() {
                     <LinkIcon className="w-4 h-4" />
                   </Button>
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadImage(file);
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ImageIcon className="w-4 h-4" />
+                  )}
+                </Button>
               </div>
 
               {attachments.length > 0 && (
