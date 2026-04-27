@@ -15,6 +15,21 @@ import { enqueueTelegram } from "../lib/telegramQueue";
 import { enqueueDiscord } from "../lib/discordQueue";
 import { embedText, similarContacts } from "../lib/embeddings";
 import { logger } from "../lib/logger";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const objectStorage = new ObjectStorageService();
+
+async function addPresignedUrls(attachments: PostAttachment[]): Promise<PostAttachment[]> {
+  return Promise.all(
+    attachments.map(async (a) => {
+      if (a.type === "image" && a.objectPath) {
+        const presignedUrl = await objectStorage.getPresignedGetUrl(a.objectPath);
+        if (presignedUrl) return { ...a, url: presignedUrl };
+      }
+      return a;
+    }),
+  );
+}
 
 const router: IRouter = Router();
 
@@ -51,7 +66,7 @@ router.get("/hub/public/:id", async (req, res) => {
     id: row.id,
     authorId: row.authorId,
     content: row.content,
-    attachments: row.attachments ?? [],
+    attachments: await addPresignedUrls(row.attachments ?? []),
     createdAt: row.createdAt,
     // Never expose raw email on a public unauthenticated endpoint.
     authorName: row.authorName ?? row.authorUsername ?? "Anonymous",
@@ -75,17 +90,18 @@ router.get("/hub", requireAuth, async (_req, res) => {
     .leftJoin(usersTable, eq(usersTable.id, postsTable.authorId))
     .orderBy(desc(postsTable.createdAt))
     .limit(100);
-  res.json(
-    rows.map((r) => ({
+  const enriched = await Promise.all(
+    rows.map(async (r) => ({
       id: r.id,
       authorId: r.authorId,
       content: r.content,
-      attachments: r.attachments ?? [],
+      attachments: await addPresignedUrls(r.attachments ?? []),
       createdAt: r.createdAt,
       authorName: r.authorName ?? r.authorUsername ?? r.authorEmail ?? "Anonymous",
       authorUsername: r.authorUsername ?? null,
     })),
   );
+  res.json(enriched);
 });
 
 // ---------- Attachment enrichment ----------

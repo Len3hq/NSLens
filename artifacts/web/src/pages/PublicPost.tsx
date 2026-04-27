@@ -27,22 +27,28 @@ type PublicPost = {
 const objectUrl = (objectPath: string) => `/api/storage${objectPath}`;
 
 function AttachmentView({ a }: { a: Attachment }) {
-  if (a.type === "image" && a.objectPath) {
+  if (a.type === "image") {
+    const src = a.url ?? (a.objectPath ? objectUrl(a.objectPath) : null);
+    if (!src) return null;
     return (
-      <img
-        src={objectUrl(a.objectPath)}
-        alt={a.aiDescription ?? ""}
-        className="rounded-md max-h-[480px] w-full object-contain bg-muted"
-      />
+      <div className="rounded-lg overflow-hidden border border-border bg-muted">
+        <img
+          src={src}
+          alt={a.aiDescription ?? ""}
+          className="block w-full max-h-[480px] object-contain"
+        />
+      </div>
     );
   }
   if (a.type === "video" && a.objectPath) {
     return (
-      <video
-        src={objectUrl(a.objectPath)}
-        controls
-        className="rounded-md max-h-[480px] w-full bg-black"
-      />
+      <div className="rounded-lg overflow-hidden border border-border bg-black">
+        <video
+          src={objectUrl(a.objectPath)}
+          controls
+          className="block w-full max-h-[480px]"
+        />
+      </div>
     );
   }
   if (a.type === "link" && a.url) {
@@ -51,23 +57,25 @@ function AttachmentView({ a }: { a: Attachment }) {
         href={a.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="block rounded-md border p-3 hover:bg-muted/40"
+        className="block rounded-lg border border-border hover:bg-muted/40 transition-colors overflow-hidden"
       >
         {a.ogImage ? (
           <img
             src={a.ogImage}
             alt=""
-            className="rounded mb-2 max-h-48 object-cover w-full"
+            className="block w-full max-h-52 object-cover"
           />
         ) : null}
-        <div className="text-sm font-medium flex items-center gap-2">
-          <LinkIcon className="w-4 h-4" />
-          {a.ogTitle ?? a.url}
+        <div className="p-3 space-y-1">
+          <div className="text-sm font-medium flex items-center gap-2 leading-snug">
+            <LinkIcon className="w-4 h-4 shrink-0" />
+            <span className="truncate">{a.ogTitle ?? a.url}</span>
+          </div>
+          {a.ogDescription ? (
+            <div className="text-xs text-muted-foreground line-clamp-2">{a.ogDescription}</div>
+          ) : null}
+          <div className="text-xs text-muted-foreground truncate">{a.url}</div>
         </div>
-        {a.ogDescription ? (
-          <div className="text-xs text-muted-foreground mt-1">{a.ogDescription}</div>
-        ) : null}
-        <div className="text-xs text-muted-foreground mt-1 truncate">{a.url}</div>
       </a>
     );
   }
@@ -148,7 +156,7 @@ export default function PublicPost() {
             <CardContent className="pt-0 text-sm space-y-3">
               {post.content ? <div className="whitespace-pre-wrap">{post.content}</div> : null}
               {post.attachments?.length ? (
-                <div className="space-y-2">
+                <div className="space-y-3 mt-1">
                   {post.attachments.map((a, i) => (
                     <AttachmentView key={i} a={a} />
                   ))}
