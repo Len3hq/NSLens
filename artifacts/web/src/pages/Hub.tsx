@@ -64,33 +64,48 @@ function AttachmentChip({ a, onRemove }: { a: DraftAttachment; onRemove: () => v
 // Compact preview thumbnail strip for the feed view (so cards stay short).
 function AttachmentPreviewStrip({ attachments }: { attachments: PostAttachment[] }) {
   if (!attachments?.length) return null;
-  const first = attachments[0];
-  const more = attachments.length - 1;
+
+  const images = attachments.filter((a) => a.type === "image");
+  const links = attachments.filter((a) => a.type === "link");
+
+  // Show up to 3 image thumbnails in a row, then link previews below.
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative h-20 w-20 rounded-lg overflow-hidden bg-muted shrink-0 border border-border">
-        {first.type === "image" && first.objectPath ? (
-          <img src={objectUrl(first.objectPath)} className="h-full w-full object-cover" alt="" />
-        ) : first.type === "link" && first.ogImage ? (
-          <img src={first.ogImage} className="h-full w-full object-cover" alt="" />
-        ) : (
-          <div className="h-full w-full grid place-items-center text-muted-foreground">
-            {first.type === "link" ? (
-              <LinkIcon className="w-6 h-6" />
-            ) : (
-              <Paperclip className="w-6 h-6" />
+    <div className="space-y-2 mt-1">
+      {images.length > 0 && (
+        <div className="flex gap-2">
+          {images.slice(0, 3).map((a, i) => {
+            const src = a.url ?? (a.objectPath ? objectUrl(a.objectPath) : null);
+            const isLast = i === 2 && images.length > 3;
+            return (
+              <div
+                key={i}
+                className="relative h-24 w-24 rounded-lg overflow-hidden bg-muted shrink-0 border border-border"
+              >
+                {src && <img src={src} className="h-full w-full object-cover" alt="" />}
+                {isLast && (
+                  <div className="absolute inset-0 bg-black/60 grid place-items-center text-white text-sm font-semibold">
+                    +{images.length - 3}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {links.slice(0, 1).map((a, i) => (
+        <div key={i} className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-2 overflow-hidden">
+          {a.ogImage && (
+            <img src={a.ogImage} className="h-10 w-10 rounded object-cover shrink-0" alt="" />
+          )}
+          {!a.ogImage && <LinkIcon className="w-4 h-4 shrink-0 text-muted-foreground" />}
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">{a.ogTitle ?? a.url}</div>
+            {a.ogDescription && (
+              <div className="text-xs text-muted-foreground truncate">{a.ogDescription}</div>
             )}
           </div>
-        )}
-        {more > 0 && (
-          <div className="absolute inset-0 bg-black/60 grid place-items-center text-white text-sm font-semibold">
-            +{more}
-          </div>
-        )}
-      </div>
-      <div className="text-xs text-muted-foreground">
-        {first.type === "link" && first.ogTitle ? first.ogTitle : null}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -152,8 +167,25 @@ export default function Hub() {
     }
   }
 
+  const pendingLinkUrl = linkInput.trim();
+  const pendingLinkValid = /^https?:\/\//i.test(pendingLinkUrl);
+
   const canPost =
-    !create.isPending && !uploading && (content.trim().length > 0 || attachments.length > 0);
+    !create.isPending &&
+    !uploading &&
+    (content.trim().length > 0 || attachments.length > 0 || pendingLinkValid);
+
+  function handlePost() {
+    const finalAttachments: DraftAttachment[] = pendingLinkValid
+      ? [...attachments, { type: "link", url: pendingLinkUrl }]
+      : attachments;
+    create.mutate({
+      data: {
+        content,
+        attachments: finalAttachments.map(({ previewUrl: _p, ...rest }) => rest),
+      },
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
@@ -246,17 +278,7 @@ export default function Hub() {
               <span className="text-xs text-muted-foreground order-last sm:order-first">
                 Posts are public to your network.
               </span>
-              <Button
-                onClick={() =>
-                  create.mutate({
-                    data: {
-                      content,
-                      attachments: attachments.map(({ previewUrl: _p, ...rest }) => rest),
-                    },
-                  })
-                }
-                disabled={!canPost}
-              >
+              <Button onClick={handlePost} disabled={!canPost}>
                 <Send className="w-4 h-4 mr-2" /> Post
               </Button>
             </DialogFooter>

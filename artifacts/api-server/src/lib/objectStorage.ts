@@ -4,6 +4,8 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+export const PRESIGNED_GET_EXPIRY = 60 * 60; // 1 hour
 import { randomUUID } from "crypto";
 import {
   type StorageObject,
@@ -122,6 +124,16 @@ export class ObjectStorageService {
     const uploadURL = await getSignedUrl(r2Client, command, { expiresIn: 900 });
 
     return { uploadURL, objectPath: `/objects/uploads/${objectId}` };
+  }
+
+  async getPresignedGetUrl(objectPath: string): Promise<string | null> {
+    try {
+      const obj = await this.getObjectEntityFile(objectPath);
+      const command = new GetObjectCommand({ Bucket: obj.bucket, Key: obj.key });
+      return await getSignedUrl(r2Client, command, { expiresIn: PRESIGNED_GET_EXPIRY });
+    } catch {
+      return null;
+    }
   }
 
   async getObjectEntityFile(objectPath: string): Promise<StorageObject> {
