@@ -301,7 +301,7 @@ export default function Hub() {
         <span className="hidden sm:inline-flex text-xs text-primary font-medium">Post</span>
       </button>
 
-      <div className="space-y-3">
+      <div className="flex flex-col gap-5">
         {posts.length === 0 ? (
           <p className="text-sm text-muted-foreground">No posts yet. Be the first.</p>
         ) : (
@@ -311,12 +311,12 @@ export default function Hub() {
             const preview = isLong ? text.slice(0, POST_PREVIEW_CHARS).trimEnd() + "…" : text;
             const handle = authorHandle(p);
             return (
-              <Link key={p.id} href={`/hub/p/${p.id}`}>
+              <Link key={p.id} href={`/hub/p/${p.id}`} className="block">
                 <Card
                   id={`post-${p.id}`}
                   className="scroll-mt-20 cursor-pointer transition-colors hover:border-primary/40 hover:bg-card"
                 >
-                  <CardContent className="p-4 space-y-3">
+                  <CardContent className="p-5 space-y-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-cyan-400 text-primary-foreground grid place-items-center text-sm font-semibold shrink-0">
                         {authorInitial(p)}
