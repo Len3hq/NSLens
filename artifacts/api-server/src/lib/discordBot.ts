@@ -40,9 +40,21 @@ export async function openDiscordDM(discordUserId: string): Promise<string | nul
 }
 
 async function handleMessage(message: Message) {
+  // Fetch partial messages so content/author are available
+  if (message.partial) {
+    try {
+      message = await message.fetch();
+    } catch (err) {
+      logger.warn({ err }, "discord: failed to fetch partial message");
+      return;
+    }
+  }
+
   // Ignore bots and non-DM channels
-  if (message.author.bot) return;
+  if (message.author?.bot) return;
   if (message.channel.type !== 1 /* DMChannel */) return;
+
+  logger.info({ userId: message.author.id }, "discord DM received");
 
   const discordUserId = message.author.id;
   const channelId = message.channel.id;
@@ -201,7 +213,7 @@ export async function startDiscordBot(): Promise<void> {
 
   client = new Client({
     intents: [GatewayIntentBits.DirectMessages],
-    partials: [Partials.Channel, Partials.Message],
+    partials: [Partials.Channel, Partials.Message, Partials.User],
   });
 
   client.once("ready", (c) => {
