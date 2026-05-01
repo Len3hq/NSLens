@@ -201,7 +201,7 @@ export async function startDiscordBot(): Promise<void> {
 
   client = new Client({
     intents: [GatewayIntentBits.DirectMessages],
-    partials: [Partials.Channel],
+    partials: [Partials.Channel, Partials.Message],
   });
 
   client.once("ready", (c) => {
