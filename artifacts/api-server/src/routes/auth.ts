@@ -2,6 +2,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { sign } from "jsonwebtoken";
 import { randomBytes } from "node:crypto";
 import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { openDiscordDM, sendDiscordDM } from "../lib/discordBot";
 
 const router: IRouter = Router();
 
@@ -138,6 +140,30 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
     res.redirect(`${PUBLIC_APP_URL}/login?error=server_error`);
     return;
   }
+
+  // Fire-and-forget: send welcome DM if the bot has never DMed this user
+  void (async () => {
+    try {
+      const [saved] = await db
+        .select({ discordDmChannelId: usersTable.discordDmChannelId })
+        .from(usersTable)
+        .where(eq(usersTable.id, discordId))
+        .limit(1);
+      if (saved?.discordDmChannelId) return;
+      const channelId = await openDiscordDM(discordId);
+      if (!channelId) return;
+      await sendDiscordDM(
+        channelId,
+        "Hey! I'm the NS Lens bot. You can DM me here anytime to manage your network — save notes about people, ask questions about your contacts, or post to the Founders Hub.\n\nSend `/help` to see what I can do.",
+      );
+      await db
+        .update(usersTable)
+        .set({ discordDmChannelId: channelId })
+        .where(eq(usersTable.id, discordId));
+    } catch (err) {
+      req.log?.error({ err }, "discord welcome DM failed");
+    }
+  })();
 
   const token = sign({ sub: discordId }, SESSION_SECRET, { expiresIn: JWT_EXPIRY });
   res.redirect(`${PUBLIC_APP_URL}/auth/callback#token=${token}`);

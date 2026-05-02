@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Partials, type Message } from "discord.js";
+import { ChannelType, Client, Events, GatewayIntentBits, Partials, type Message } from "discord.js";
 import { db, usersTable, notificationsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { logger } from "./logger";
@@ -214,6 +214,24 @@ export async function startDiscordBot(): Promise<void> {
   client = new Client({
     intents: [GatewayIntentBits.DirectMessages],
     partials: [Partials.Channel, Partials.Message, Partials.User],
+  });
+
+  // Discord only sends CHANNEL_CREATE for brand-new DM channels. For existing
+  // DM channels the bot has spoken in before, a restart leaves the cache empty.
+  // When MESSAGE_CREATE then arrives, Discord.js can't build a partial DMChannel
+  // (no `type` in the raw payload) so it silently drops the event — messageCreate
+  // never fires. Fix: intercept the raw packet (fires before handlePacket) and
+  // pre-seed the channel cache so Discord.js can proceed normally.
+  client.on(Events.Raw, (packet: { t: string; d: Record<string, unknown> }) => {
+    if (packet.t !== "MESSAGE_CREATE" || packet.d.guild_id) return;
+    const channelId = packet.d.channel_id as string;
+    if (!client!.channels.cache.has(channelId)) {
+      (client!.channels as any)._add({
+        id: channelId,
+        type: ChannelType.DM,
+        recipients: packet.d.author ? [packet.d.author] : [],
+      });
+    }
   });
 
   client.once("ready", (c) => {
