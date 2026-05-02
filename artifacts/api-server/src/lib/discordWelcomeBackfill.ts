@@ -28,17 +28,19 @@ export async function backfillDiscordWelcome(): Promise<void> {
       }
 
       const ok = await sendDiscordDM(channelId, WELCOME_MESSAGE);
-      if (!ok) {
-        failed++;
-        continue;
-      }
 
-      // Write channel ID before moving to next user — if the process crashes
-      // mid-run, this user won't be picked up again on the next boot.
+      // Always persist the channel ID once we have it, even when the send
+      // failed (e.g. DiscordAPIError 50278 — user has no mutual guild with
+      // the bot). Without this, NULL users are retried on every server restart.
       await db
         .update(usersTable)
         .set({ discordDmChannelId: channelId })
         .where(eq(usersTable.id, user.id));
+
+      if (!ok) {
+        failed++;
+        continue;
+      }
 
       sent++;
 
