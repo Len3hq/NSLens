@@ -2,6 +2,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { sign } from "jsonwebtoken";
 import { randomBytes } from "node:crypto";
 import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { openDiscordDM, sendDiscordDM } from "../lib/discordBot";
 
 
 const router: IRouter = Router();
@@ -32,7 +34,8 @@ router.get("/auth/discord", (_req: Request, res: Response) => {
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
     response_type: "code",
-    scope: "identify",
+    scope: "identify applications.commands",
+    integration_type: "1",
     state,
   });
   res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
@@ -139,6 +142,31 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
     res.redirect(`${PUBLIC_APP_URL}/login?error=server_error`);
     return;
   }
+
+  // Fire-and-forget: send welcome DM on first install. Works now because the
+  // user just went through the user-install OAuth flow (integration_type=1).
+  void (async () => {
+    try {
+      const [saved] = await db
+        .select({ discordDmChannelId: usersTable.discordDmChannelId })
+        .from(usersTable)
+        .where(eq(usersTable.id, discordId))
+        .limit(1);
+      if (saved?.discordDmChannelId) return;
+      const channelId = await openDiscordDM(discordId);
+      if (!channelId) return;
+      await sendDiscordDM(
+        channelId,
+        "Hey! I'm the NS Lens bot. You can DM me here anytime to manage your network — save notes about people, ask questions about your contacts, or post to the Founders Hub.\n\nSend `/help` to see what I can do.",
+      );
+      await db
+        .update(usersTable)
+        .set({ discordDmChannelId: channelId })
+        .where(eq(usersTable.id, discordId));
+    } catch (err) {
+      req.log?.error({ err }, "discord welcome DM failed");
+    }
+  })();
 
   const token = sign({ sub: discordId }, SESSION_SECRET, { expiresIn: JWT_EXPIRY });
   res.redirect(`${PUBLIC_APP_URL}/auth/callback#token=${token}`);

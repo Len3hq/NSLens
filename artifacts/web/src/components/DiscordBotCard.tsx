@@ -6,6 +6,8 @@ import { Unlink } from "lucide-react";
 import { FaDiscord } from "react-icons/fa";
 import { toast } from "sonner";
 
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined ?? "").replace(/\/$/, "");
+
 type DiscordBotStatus = {
   linked: boolean;
   botConfigured: boolean;
@@ -32,8 +34,6 @@ export default function DiscordBotCard() {
   });
 
   if (isLoading || !data?.botConfigured) return null;
-
-  const deepLink = data.botClientId ? `https://discord.com/users/${data.botClientId}` : null;
 
   if (data.linked) {
     return (
@@ -74,20 +74,16 @@ export default function DiscordBotCard() {
           Receive contact reminders and Founders Hub alerts in Discord. Chat with the bot to save
           notes, ask questions about your network, or post to the Hub.
         </p>
-        <ol className="list-decimal pl-4 space-y-1 text-muted-foreground">
-          <li>Open the NS Lens bot on Discord using the button below.</li>
-          <li>Send it any message — that's all it takes to activate.</li>
-        </ol>
-        {deepLink ? (
-          <a href={deepLink} target="_blank" rel="noreferrer" className="block">
-            <Button className="w-full sm:w-auto">
-              <FaDiscord className="w-4 h-4 mr-2" />
-              Open NS Lens Bot
-            </Button>
-          </a>
-        ) : (
-          <p className="text-xs text-muted-foreground">Bot link unavailable — contact support.</p>
-        )}
+        <p className="text-muted-foreground">
+          Click below to add the NS Lens bot to your Discord account. You'll get a welcome DM
+          automatically once it's connected.
+        </p>
+        <a href={`${API_URL}/api/auth/discord`} className="block">
+          <Button className="w-full sm:w-auto">
+            <FaDiscord className="w-4 h-4 mr-2" />
+            Add to Discord
+          </Button>
+        </a>
       </CardContent>
     </Card>
   );
