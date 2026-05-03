@@ -7,7 +7,6 @@ import {
   setTelegramWebhook,
 } from "./lib/telegram";
 import { startDiscordBot } from "./lib/discordBot";
-import { backfillDiscordWelcome } from "./lib/discordWelcomeBackfill";
 import { backfillEmbeddings } from "./lib/embeddings";
 
 const rawPort = process.env["PORT"];
@@ -44,16 +43,7 @@ app.listen(port, async (err) => {
     }
   }
 
-  // Start Discord bot (Gateway WebSocket) if token is configured. Once the bot
-  // is connected, run the one-time welcome DM backfill for existing users who
-  // signed up before the welcome message feature was introduced.
-  startDiscordBot()
-    .then(() =>
-      backfillDiscordWelcome().catch((err) =>
-        logger.error({ err }, "discord welcome backfill failed"),
-      ),
-    )
-    .catch((err) => logger.error({ err }, "discord bot failed to start"));
+  startDiscordBot().catch((err) => logger.error({ err }, "discord bot failed to start"));
 
   // Backfill any contacts/interactions missing embeddings. Runs once on boot
   // and is a no-op when everything is already embedded.

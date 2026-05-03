@@ -54,8 +54,8 @@ export default function TelegramCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="w-4 h-4" /> Telegram
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Send className="w-4 h-4 shrink-0" /> Telegram
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">Loading…</CardContent>
@@ -63,36 +63,22 @@ export default function TelegramCard() {
     );
   }
 
-  if (!data?.botConfigured) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="w-4 h-4" /> Telegram
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          The bot isn't configured on the server yet. Add your TELEGRAM_BOT_TOKEN secret and
-          restart.
-        </CardContent>
-      </Card>
-    );
-  }
+  if (!data?.botConfigured) return null;
 
   if (data.linked) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="w-4 h-4" /> Telegram
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Send className="w-4 h-4 shrink-0" /> Telegram
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm">
-            Connected. Reminders and Hub matches will arrive in your chat with{" "}
+          <p className="text-sm text-muted-foreground">
+            Connected. You'll receive contact reminders and Founders Hub alerts in your chat with{" "}
             {botUsername ? (
               <a
-                className="underline"
+                className="underline text-foreground"
                 href={`https://t.me/${botUsername}`}
                 target="_blank"
                 rel="noreferrer"
@@ -100,9 +86,9 @@ export default function TelegramCard() {
                 @{botUsername}
               </a>
             ) : (
-              "your bot"
+              "the bot"
             )}
-            . You can chat back to add contacts, ask questions, or post to the Hub.
+            . Reply anytime to save notes, ask questions, or post to the Hub.
           </p>
           <Button
             variant="outline"
@@ -121,29 +107,34 @@ export default function TelegramCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Send className="w-4 h-4" /> Connect Telegram
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Send className="w-4 h-4 shrink-0" /> Connect Telegram
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="space-y-4 text-sm">
         {!code ? (
           <>
             <p className="text-muted-foreground">
-              Get reminders and Hub matches in Telegram, and chat with your network from your
-              phone.
+              Receive contact reminders and Founders Hub alerts in Telegram. Chat with the bot to
+              save notes, ask questions about your network, or post to the Hub.
             </p>
-            <Button onClick={() => link.mutate()} disabled={link.isPending}>
-              {link.isPending ? "Generating…" : "Get linking code"}
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => link.mutate()}
+              disabled={link.isPending}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {link.isPending ? "Generating…" : "Connect Telegram"}
             </Button>
           </>
         ) : (
           <>
-            <ol className="list-decimal pl-5 space-y-1">
+            <ol className="list-decimal pl-4 space-y-2 text-muted-foreground">
               <li>
                 Open{" "}
                 {botUsername ? (
                   <a
-                    className="underline"
+                    className="underline text-foreground"
                     href={deepLink ?? `https://t.me/${botUsername}`}
                     target="_blank"
                     rel="noreferrer"
@@ -151,24 +142,24 @@ export default function TelegramCard() {
                     @{botUsername} on Telegram
                   </a>
                 ) : (
-                  "your bot on Telegram"
+                  "the bot on Telegram"
                 )}
                 .
               </li>
               <li>
-                Send this command:
-                <div className="mt-1 flex items-center gap-2">
-                  <code className="px-2 py-1 rounded bg-muted font-mono text-sm">/start {code}</code>
-                  <Button size="sm" variant="ghost" onClick={copyCommand}>
+                Send this command to link your account:
+                <div className="mt-1.5 flex items-center gap-2">
+                  <code className="flex-1 min-w-0 truncate px-2 py-1 rounded bg-muted font-mono text-sm">/start {code}</code>
+                  <Button size="sm" variant="ghost" className="shrink-0" onClick={copyCommand}>
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
               </li>
             </ol>
             <p className="text-xs text-muted-foreground">
-              Code expires in 30 minutes. After linking, this card will refresh automatically.
+              Code expires in 30 minutes. This card will update automatically once you're linked.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {deepLink && (
                 <a href={deepLink} target="_blank" rel="noreferrer">
                   <Button size="sm">Open Telegram</Button>
