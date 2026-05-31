@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Users, MessageSquare, AlarmClock, Bell, Plus, CheckCircle2, Circle, X, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import TelegramCard from "@/components/TelegramCard";
+import DiscordBotCard from "@/components/DiscordBotCard";
 import { WelcomeTour, TourTrigger } from "@/components/WelcomeTour";
 
 export default function Dashboard() {
@@ -27,7 +28,7 @@ export default function Dashboard() {
   const d = data;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6">
       <WelcomeTour />
       <div className="flex items-center justify-between">
         <div>
@@ -52,7 +53,7 @@ export default function Dashboard() {
         />
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard icon={Users} label="Contacts" value={isLoading ? "..." : d?.contactCount ?? 0} />
         <StatCard icon={MessageSquare} label="Interactions" value={isLoading ? "..." : d?.interactionCount ?? 0} />
         <StatCard icon={AlarmClock} label="Stale contacts" value={isLoading ? "..." : d?.staleCount ?? 0} />
@@ -97,7 +98,10 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <TelegramCard />
+      <div className="grid md:grid-cols-2 gap-4">
+        <TelegramCard />
+        <DiscordBotCard />
+      </div>
     </div>
   );
 }

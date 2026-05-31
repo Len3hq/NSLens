@@ -43,7 +43,6 @@ app.listen(port, async (err) => {
     }
   }
 
-  // Start Discord bot (Gateway WebSocket) if token is configured.
   startDiscordBot().catch((err) => logger.error({ err }, "discord bot failed to start"));
 
   // Backfill any contacts/interactions missing embeddings. Runs once on boot

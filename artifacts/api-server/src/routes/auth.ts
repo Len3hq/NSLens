@@ -5,6 +5,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { openDiscordDM, sendDiscordDM } from "../lib/discordBot";
 
+
 const router: IRouter = Router();
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID ?? "";
@@ -33,7 +34,8 @@ router.get("/auth/discord", (_req: Request, res: Response) => {
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
     response_type: "code",
-    scope: "identify",
+    scope: "identify applications.commands",
+    integration_type: "1",
     state,
   });
   res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
@@ -141,7 +143,8 @@ router.get("/auth/discord/callback", async (req: Request, res: Response) => {
     return;
   }
 
-  // Fire-and-forget: send welcome DM if the bot has never DMed this user
+  // Fire-and-forget: send welcome DM on first install. Works now because the
+  // user just went through the user-install OAuth flow (integration_type=1).
   void (async () => {
     try {
       const [saved] = await db
